@@ -1,0 +1,31 @@
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+.toggleBtn {
+  align-self: flex-start;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 0.2rem 0;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+}
+
+.toggleBtn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.toggleBtn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.monthStatus {
+  font-size: 0.8rem;
+  color: var(--text-3);
+  margin: 0.25rem 0;
+}

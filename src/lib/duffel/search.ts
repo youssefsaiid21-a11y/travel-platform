@@ -317,6 +317,51 @@ export interface PriceCalendarEntry {
   currency: string | null;
 }
 
+function daysBetween(fromDate: string, toDate: string): number {
+  return Math.round(
+    (Date.parse(toDate + "T00:00:00Z") - Date.parse(fromDate + "T00:00:00Z")) / 86_400_000
+  );
+}
+
+// Shared by getPriceCalendar and getMonthPriceCalendar - runs the exact same
+// createOfferRequest -> filterByPreferences -> rankOffers pipeline as a real
+// search for a single shifted date, so a calendar tile's price always matches
+// what clicking that tile would actually search for and find. `date` is the
+// departure date to price; return_date (if any) is shifted by the same delta
+// as `date` relative to params.departure_date, preserving trip length.
+async function priceEntryForDate(
+  params: SearchParams,
+  date: string,
+  knownExactDate?: Pick<PriceCalendarEntry, "cheapestAmount" | "currency">
+): Promise<PriceCalendarEntry> {
+  if (date === params.departure_date && knownExactDate) {
+    return { date, ...knownExactDate };
+  }
+
+  const delta = daysBetween(params.departure_date, date);
+  const shifted: SearchParams = {
+    ...params,
+    departure_date: date,
+    ...(params.return_date ? { return_date: addDays(params.return_date, delta) } : {}),
+  };
+
+  try {
+    const offers = await createOfferRequest(shifted);
+    // Apply the same preference filters as the main search - otherwise a
+    // date tile can advertise a price (e.g. the cheapest non-refundable
+    // fare) that "refundable only" would never actually return if clicked.
+    const { offers: filtered } = filterByPreferences(offers, shifted);
+    const cheapest = rankOffers(filtered)[0];
+    return {
+      date,
+      cheapestAmount: cheapest?.total_amount ?? null,
+      currency: cheapest?.total_currency ?? null,
+    };
+  } catch {
+    return { date, cheapestAmount: null, currency: null };
+  }
+}
+
 // Builds a visible price-per-date strip around the requested departure date -
 // like Google Flights' date grid - instead of silently picking one alternative
 // the way searchWithFallback does. Independent of searchWithFallback so it never
@@ -340,38 +385,43 @@ export async function getPriceCalendar(
     deltas.map(async (delta): Promise<PriceCalendarEntry | null> => {
       const date = addDays(params.departure_date, delta);
       if (date < today) return null;
-
-      if (delta === 0 && knownExactDate) {
-        return { date, ...knownExactDate };
-      }
-
-      const shifted: SearchParams = {
-        ...params,
-        departure_date: date,
-        ...(params.return_date ? { return_date: addDays(params.return_date, delta) } : {}),
-      };
-
-      try {
-        const offers = await createOfferRequest(shifted);
-        // Apply the same preference filters as the main search - otherwise a
-        // date tile can advertise a price (e.g. the cheapest non-refundable
-        // fare) that "refundable only" would never actually return if clicked.
-        const { offers: filtered } = filterByPreferences(offers, shifted);
-        const cheapest = rankOffers(filtered)[0];
-        return {
-          date,
-          cheapestAmount: cheapest?.total_amount ?? null,
-          currency: cheapest?.total_currency ?? null,
-        };
-      } catch {
-        return { date, cheapestAmount: null, currency: null };
-      }
+      return priceEntryForDate(params, date, knownExactDate);
     })
   );
 
   return entries
     .filter((e): e is PriceCalendarEntry => e !== null)
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// Full calendar-month view (weeks as rows, days as columns) - like
+// getPriceCalendar, but aligned to the actual calendar month containing
+// params.departure_date instead of a fixed-size window around it, so the UI
+// can render a real month grid. Reuses the exact same per-date pricing
+// pipeline (priceEntryForDate) as getPriceCalendar, so tile prices carry the
+// same "matches what clicking it would search for" guarantee. Past dates
+// within the month are omitted, same as getPriceCalendar.
+export async function getMonthPriceCalendar(
+  params: SearchParams,
+  knownExactDate?: Pick<PriceCalendarEntry, "cheapestAmount" | "currency">
+): Promise<PriceCalendarEntry[]> {
+  if (isMultiCity(params)) return [];
+
+  const today = new Date().toISOString().split("T")[0];
+  const [year, month] = params.departure_date.split("-").map(Number);
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  const dates = Array.from({ length: daysInMonth }, (_, i) => {
+    const day = String(i + 1).padStart(2, "0");
+    const monthStr = String(month).padStart(2, "0");
+    return `${year}-${monthStr}-${day}`;
+  }).filter((date) => date >= today);
+
+  const entries = await Promise.all(
+    dates.map((date) => priceEntryForDate(params, date, knownExactDate))
+  );
+
+  return entries.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export interface FilterResult {

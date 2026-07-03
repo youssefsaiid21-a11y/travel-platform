@@ -1,0 +1,82 @@
+.month {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.header {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: center;
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.3rem;
+}
+
+.weekday {
+  font-size: 0.65rem;
+  color: var(--text-3);
+  text-align: center;
+  padding-bottom: 0.15rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.3rem;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: 44px;
+  padding: 0.3rem 0.2rem;
+  border: 1px solid var(--border-solid);
+  border-radius: var(--r-md);
+  background: var(--surface-raised);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.cell:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.cell:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.empty {
+  visibility: hidden;
+}
+
+.selected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  opacity: 1;
+}
+
+.cheapest {
+  border-color: var(--success);
+}
+
+.dayNum {
+  font-size: 0.7rem;
+  color: var(--text-3);
+}
+
+.dayPrice {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-1);
+}

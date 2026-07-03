@@ -17,7 +17,12 @@ vi.mock("@/lib/duffel/search", () => ({
   getPriceCalendar: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock("@/lib/duffel/explore", () => ({
+  exploreDestinations: vi.fn(),
+}));
+
 import { searchWithFallback } from "@/lib/duffel/search";
+import { exploreDestinations } from "@/lib/duffel/explore";
 import { POST } from "@/app/api/chat/route";
 import { NextRequest } from "next/server";
 
@@ -124,6 +129,7 @@ describe("POST /api/chat", () => {
     mockCreate.mockReset();
     vi.mocked(searchWithFallback).mockReset();
     vi.mocked(searchWithFallback).mockResolvedValue(MOCK_SEARCH_RESULT);
+    vi.mocked(exploreDestinations).mockReset();
     // generateSearchReply calls mockCreate a second time; let it return undefined → uses template fallback
   });
 
@@ -289,6 +295,52 @@ describe("POST /api/chat", () => {
     expect(body.search_failed).toBe(true);
     expect(body.reply).toMatch(/one of the destination airports/i);
     expect(body.reply).not.toContain("CDG"); // doesn't misattribute the error to the valid top-level destination
+  });
+
+  it("explore-anywhere mode: no destination in the parsed tool call skips validateParams/searchWithFallback and returns ranked destinations", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        departure_date: "2026-09-01",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    vi.mocked(exploreDestinations).mockResolvedValueOnce([
+      { destination: "CDG", city: "Paris", country: "France", cheapestAmount: "80.00", currency: "GBP", airline: "Air France" },
+      { destination: "JFK", city: "New York", country: "United States", cheapestAmount: "350.00", currency: "GBP", airline: "British Airways" },
+    ]);
+
+    const res = await POST(
+      makeRequest({ message: "Cheap flights from London this weekend, anywhere" })
+    );
+    const body = await readSSE(res);
+
+    expect(body.offers).toHaveLength(0);
+    expect(body.search_params).toBeNull();
+    expect(body.explore_results).toHaveLength(2);
+    expect(body.explore_results?.[0].destination).toBe("CDG");
+    expect(body.explore_params?.origin).toBe("LHR");
+    expect(body.reply).toMatch(/Paris/);
+    expect(vi.mocked(searchWithFallback)).not.toHaveBeenCalled();
+    expect(vi.mocked(exploreDestinations)).toHaveBeenCalledTimes(1);
+  });
+
+  it("explore-anywhere mode: empty results still returns a friendly reply instead of an error", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        departure_date: "2026-09-01",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    vi.mocked(exploreDestinations).mockResolvedValueOnce([]);
+
+    const res = await POST(makeRequest({ message: "Anywhere from London this weekend" }));
+    const body = await readSSE(res);
+
+    expect(body.explore_results).toEqual([]);
+    expect(body.reply).toBeTruthy();
+    expect(body.search_params).toBeNull();
   });
 
   it("offer prices are raw strings from Duffel - no computed price in response", async () => {
