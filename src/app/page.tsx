@@ -133,6 +133,12 @@ export default function Home() {
       return [];
     }
   });
+  // Tracks which assistant message indexes have had "Track this price"
+  // clicked (server-persisted via /api/tracked-searches - this Set is just
+  // local UI state so the button can flip to a confirmed state).
+  const [trackedMessageIdx, setTrackedMessageIdx] = useState<Set<number>>(new Set());
+  const [trackingMessageIdx, setTrackingMessageIdx] = useState<number | null>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -423,6 +429,22 @@ export default function Home() {
                     offers={msg.offers}
                     onSelect={(o) => handleSelectOffer(o, msg.searchParams)}
                   />
+                  {msg.searchParams && (
+                    <div className={styles.trackPriceRow}>
+                      <button
+                        type="button"
+                        className={styles.trackPriceBtn}
+                        disabled={trackingMessageIdx === i || trackedMessageIdx.has(i)}
+                        onClick={() => handleTrackPrice(i, msg.offers!, msg.searchParams!)}
+                      >
+                        {trackedMessageIdx.has(i)
+                          ? "Tracking this price"
+                          : trackingMessageIdx === i
+                            ? "Saving…"
+                            : "Track this price"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
               {suggestions && (
@@ -539,6 +561,42 @@ export default function Home() {
       </div>
     </div>
   );
+
+  async function handleTrackPrice(
+    messageIdx: number,
+    offers: NormalizedOffer[],
+    searchParams: SearchParams
+  ) {
+    if (!session?.user) {
+      router.push("/login?callbackUrl=/");
+      return;
+    }
+    if (trackingMessageIdx !== null || trackedMessageIdx.has(messageIdx)) return;
+
+    const cheapest = offers.reduce((min, o) =>
+      parseFloat(o.total_amount) < parseFloat(min.total_amount) ? o : min
+    , offers[0]);
+
+    setTrackingMessageIdx(messageIdx);
+    try {
+      const res = await fetch("/api/tracked-searches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          searchParams,
+          cheapestAmount: cheapest.total_amount,
+          cheapestCurrency: cheapest.total_currency,
+        }),
+      });
+      if (res.ok) {
+        setTrackedMessageIdx((prev) => new Set(prev).add(messageIdx));
+      }
+    } catch {
+      // Best-effort - the button just stays in its untracked state on failure.
+    } finally {
+      setTrackingMessageIdx(null);
+    }
+  }
 
   function handleSelectOffer(offer: NormalizedOffer, searchParams?: SearchParams | null) {
     if (!session?.user) {

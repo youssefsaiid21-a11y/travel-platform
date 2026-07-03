@@ -15,6 +15,7 @@ model User {
   createdAt        DateTime         @default(now())
   bookings         Booking[]
   passengerProfile PassengerProfile?
+  trackedSearches  TrackedSearch[]
 }
 
 model PassengerProfile {
@@ -60,4 +61,27 @@ model Booking {
 
   @@index([userId, createdAt])
   @@index([stripePaymentIntentId])
+}
+
+// A saved search a user wants to be notified about if the price drops.
+// Checked periodically by POST /api/cron/check-price-drops (see that route
+// for how a real deployment would schedule the calls).
+model TrackedSearch {
+  id                String   @id @default(cuid())
+  userId            String
+  origin            String
+  destination       String
+  departureDate     String
+  returnDate        String?
+  // JSON-encoded SearchParams["passengers"], e.g. [{"type":"adult","count":1}]
+  passengers        String
+  cabinClass        String?
+  lastKnownPrice    String
+  lastKnownCurrency String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([departureDate])
 }

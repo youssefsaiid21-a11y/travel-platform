@@ -8,6 +8,7 @@ import Link from "next/link";
 import { ShareButtons } from "@/components/ShareButtons";
 import { CopyRefBtn } from "@/components/CopyRefBtn";
 import { PrintBtn } from "@/components/PrintBtn";
+import { getOrderStatus, checkForScheduleChanges, type ScheduleChangeResult } from "@/lib/duffel/orders";
 import styles from "./page.module.css";
 
 export async function generateMetadata({
@@ -63,6 +64,23 @@ export default async function BookingDetailPage({
 
   const offer = JSON.parse(booking.offerSnapshot) as NormalizedOffer;
   const passengerNames = JSON.parse(booking.passengerNames) as string[];
+
+  // Post-booking flight status: re-fetch the order from Duffel and diff its
+  // current segment times against what was booked. Read-only - this never
+  // creates, changes, or cancels the order (CLAUDE.md guardrail #2 doesn't
+  // apply here). Failures degrade gracefully - the rest of the page still
+  // renders even if Duffel is unreachable.
+  let scheduleCheck: ScheduleChangeResult | null = null;
+  let scheduleCheckFailed = false;
+  if (booking.status === "confirmed" && booking.duffelOrderId) {
+    try {
+      const order = await getOrderStatus(booking.duffelOrderId);
+      scheduleCheck = checkForScheduleChanges(offer, order);
+    } catch (err) {
+      console.error("[booking detail] flight status check failed:", err);
+      scheduleCheckFailed = true;
+    }
+  }
 
   return (
     <div className={styles.page}>
@@ -177,6 +195,52 @@ export default async function BookingDetailPage({
             })()}
           </p>
         </div>
+
+        {booking.status === "confirmed" && booking.duffelOrderId && (
+          <div className={styles.card}>
+            <h2 className={styles.cardTitle}>Flight status</h2>
+            {scheduleCheckFailed ? (
+              <p className={styles.statusUnavailable}>
+                Unable to check for schedule changes right now - try again later.
+              </p>
+            ) : scheduleCheck?.hasChanges ? (
+              <>
+                <p className={styles.statusChanged}>
+                  The airline has changed your flight times:
+                </p>
+                {scheduleCheck.segmentChanges.map((c) => (
+                  <div
+                    key={`${c.sliceIndex}-${c.segmentIndex}`}
+                    className={styles.scheduleChangeRow}
+                  >
+                    <span className={styles.scheduleChangeFlight}>
+                      {c.flightNumber} · {c.origin} → {c.destination}
+                    </span>
+                    <span className={styles.scheduleChangeTimes}>
+                      <span className={styles.scheduleChangeOld}>
+                        {formatDateTime(c.originalDepartingAt)}
+                      </span>
+                      {" → "}
+                      <span className={styles.scheduleChangeNew}>
+                        {formatDateTime(c.currentDepartingAt)}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <p className={styles.statusOk}>
+                No schedule changes - your flight times match what you booked.
+              </p>
+            )}
+            {scheduleCheck?.hasPendingAirlineChange && (
+              <p className={styles.statusPending}>
+                The airline has proposed a change that needs a response - contact
+                support with your booking reference above.
+              </p>
+            )}
+          </div>
+        )}
 
         {booking.status === "confirmed" && (() => {
           const outboundFirst = offer.slices[0].segments[0];
