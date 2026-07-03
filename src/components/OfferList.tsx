@@ -3,11 +3,15 @@
 import { useState, useMemo } from "react";
 import { OfferCard, type OfferTag } from "./OfferCard";
 import type { NormalizedOffer } from "@/lib/duffel/types";
+import { getLayovers } from "@/lib/duffel/layover";
+import { allianceForCarrier, ALLIANCES, type Alliance } from "@/lib/airlines/alliances";
 import styles from "./OfferList.module.css";
 
 type SortKey = "price" | "duration" | "departure";
 type StopsFilter = "all" | "nonstop" | "max1";
 type RefundFilter = "any" | "refundable";
+type AllianceFilter = "all" | Alliance;
+type LayoverDurationFilter = "any" | "under2h" | "under4h";
 
 const SORT_LABELS: Record<SortKey, string> = {
   price: "Cheapest",
@@ -20,6 +24,27 @@ const STOPS_LABELS: Record<StopsFilter, string> = {
   nonstop: "Non-stop",
   max1: "Max 1 stop",
 };
+
+const LAYOVER_DURATION_LABELS: Record<LayoverDurationFilter, string> = {
+  any: "Any layover",
+  under2h: "Under 2h",
+  under4h: "Under 4h",
+};
+
+const LAYOVER_DURATION_MAX_MINUTES: Record<"under2h" | "under4h", number> = {
+  under2h: 120,
+  under4h: 240,
+};
+
+function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
+  const next = new Set(set);
+  if (next.has(value)) {
+    next.delete(value);
+  } else {
+    next.add(value);
+  }
+  return next;
+}
 
 function totalMinutes(offer: NormalizedOffer) {
   return offer.slices.reduce((sum, s) => {
@@ -39,9 +64,39 @@ export function OfferList({
   const [sort, setSort] = useState<SortKey>("price");
   const [stops, setStops] = useState<StopsFilter>("all");
   const [refund, setRefund] = useState<RefundFilter>("any");
+  const [excludedAirlines, setExcludedAirlines] = useState<Set<string>>(new Set());
+  const [alliance, setAlliance] = useState<AllianceFilter>("all");
+  const [layoverDuration, setLayoverDuration] = useState<LayoverDurationFilter>("any");
+  const [excludedLayoverAirports, setExcludedLayoverAirports] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
 
   const VISIBLE = 5;
+
+  // Airlines actually present in this result set, for the airline chips -
+  // derived from the full (unfiltered) offer list so chips don't disappear
+  // as other filters narrow the results.
+  const availableAirlines = useMemo(() => {
+    const byCode = new Map<string, string>();
+    for (const o of offers) {
+      if (!byCode.has(o.owner.iata_code)) byCode.set(o.owner.iata_code, o.owner.name);
+    }
+    return [...byCode.entries()]
+      .map(([code, name]) => ({ code, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [offers]);
+
+  const availableAlliances = useMemo(() => {
+    const present = new Set(offers.map((o) => allianceForCarrier(o.owner.iata_code)));
+    return ALLIANCES.filter((a) => present.has(a));
+  }, [offers]);
+
+  const availableLayoverAirports = useMemo(() => {
+    const set = new Set<string>();
+    for (const o of offers) {
+      for (const lv of getLayovers(o)) set.add(lv.airport);
+    }
+    return [...set].sort();
+  }, [offers]);
 
   const filtered = useMemo(() => {
     let result = [...offers];
@@ -54,6 +109,25 @@ export function OfferList({
 
     if (refund === "refundable") {
       result = result.filter((o) => o.conditions.refundable);
+    }
+
+    if (excludedAirlines.size > 0) {
+      result = result.filter((o) => !excludedAirlines.has(o.owner.iata_code));
+    }
+
+    if (alliance !== "all") {
+      result = result.filter((o) => allianceForCarrier(o.owner.iata_code) === alliance);
+    }
+
+    if (layoverDuration !== "any") {
+      const maxMinutes = LAYOVER_DURATION_MAX_MINUTES[layoverDuration];
+      result = result.filter((o) => getLayovers(o).every((lv) => lv.minutes < maxMinutes));
+    }
+
+    if (excludedLayoverAirports.size > 0) {
+      result = result.filter((o) =>
+        getLayovers(o).every((lv) => !excludedLayoverAirports.has(lv.airport))
+      );
     }
 
     if (sort === "price") {
@@ -70,7 +144,16 @@ export function OfferList({
     }
 
     return result;
-  }, [offers, sort, stops, refund]);
+  }, [offers, sort, stops, refund, excludedAirlines, alliance, layoverDuration, excludedLayoverAirports]);
+
+  function clearFilters() {
+    setStops("all");
+    setRefund("any");
+    setExcludedAirlines(new Set());
+    setAlliance("all");
+    setLayoverDuration("any");
+    setExcludedLayoverAirports(new Set());
+  }
 
   const sortedByPrice = useMemo(
     () => [...offers].sort((a, b) => parseFloat(a.total_amount) - parseFloat(b.total_amount)),
@@ -141,15 +224,77 @@ export function OfferList({
         >
           Refundable
         </button>
+        {availableAlliances.length > 1 && (
+          <>
+            <div className={styles.divider} aria-hidden="true" />
+            <div className={styles.group} role="group" aria-label="Filter by alliance">
+              {(["all" as const, ...availableAlliances]).map((k) => (
+                <button
+                  key={k}
+                  className={`${styles.chip} ${alliance === k ? styles.active : ""}`}
+                  onClick={() => setAlliance(k)}
+                  aria-pressed={alliance === k}
+                >
+                  {k === "all" ? "Any alliance" : k}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {availableAirlines.length > 1 && (
+          <>
+            <div className={styles.divider} aria-hidden="true" />
+            <div className={styles.group} role="group" aria-label="Show airlines">
+              {availableAirlines.map(({ code, name }) => (
+                <button
+                  key={code}
+                  className={`${styles.chip} ${!excludedAirlines.has(code) ? styles.active : ""}`}
+                  onClick={() => setExcludedAirlines((prev) => toggleInSet(prev, code))}
+                  aria-pressed={!excludedAirlines.has(code)}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {availableLayoverAirports.length > 0 && (
+          <>
+            <div className={styles.divider} aria-hidden="true" />
+            <div className={styles.group} role="group" aria-label="Layover duration">
+              {(["any", "under2h", "under4h"] as const).map((k) => (
+                <button
+                  key={k}
+                  className={`${styles.chip} ${layoverDuration === k ? styles.active : ""}`}
+                  onClick={() => setLayoverDuration(k)}
+                  aria-pressed={layoverDuration === k}
+                >
+                  {LAYOVER_DURATION_LABELS[k]}
+                </button>
+              ))}
+            </div>
+            <div className={styles.divider} aria-hidden="true" />
+            <div className={styles.group} role="group" aria-label="Avoid connecting through">
+              {availableLayoverAirports.map((code) => (
+                <button
+                  key={code}
+                  className={`${styles.chip} ${excludedLayoverAirports.has(code) ? styles.active : ""}`}
+                  onClick={() => setExcludedLayoverAirports((prev) => toggleInSet(prev, code))}
+                  aria-pressed={excludedLayoverAirports.has(code)}
+                  title={`Avoid connecting through ${code}`}
+                >
+                  Avoid {code}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {filtered.length === 0 ? (
         <div className={styles.empty}>
-          No flights match{stops !== "all" && refund === "refundable" ? " non-stop refundable" : stops !== "all" ? " your stops filter" : " the refundable filter"} -{" "}
-          <button
-            className={styles.clearBtn}
-            onClick={() => { setStops("all"); setRefund("any"); }}
-          >
+          No flights match your filters -{" "}
+          <button className={styles.clearBtn} onClick={clearFilters}>
             clear filters
           </button>
         </div>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { NormalizedOffer, NormalizedService } from "@/lib/duffel/types";
+import { layoverMinutes, formatLayover } from "@/lib/duffel/layover";
 import styles from "./OfferCard.module.css";
 
 export type OfferTag = "cheapest" | "fastest" | "best";
@@ -35,13 +36,6 @@ function formatDuration(iso: string) {
 
 function isNextDay(dep: string, arr: string) {
   return new Date(arr).toDateString() !== new Date(dep).toDateString();
-}
-
-function fmtLayover(dep: string, arr: string): string {
-  const mins = Math.round((new Date(dep).getTime() - new Date(arr).getTime()) / 60000);
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
 function formatPrice(amount: string, currency: string) {
@@ -278,7 +272,7 @@ function SliceRow({
                 <div className={styles.layoverRow}>
                   <div className={styles.layoverLine} />
                   <span className={styles.layoverLabel}>
-                    {fmtLayover(slice.segments[i + 1].departing_at, seg.arriving_at)} layover · {seg.destination.iata_code}
+                    {formatLayover(layoverMinutes(seg.arriving_at, slice.segments[i + 1].departing_at))} layover · {seg.destination.iata_code}
                   </span>
                 </div>
               )}
