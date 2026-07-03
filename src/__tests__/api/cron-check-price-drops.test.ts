@@ -1,4 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
+
+function makeRequest() {
+  return new NextRequest("http://localhost/api/cron/check-price-drops", { method: "POST" });
+}
 
 const mockFindMany = vi.hoisted(() => vi.fn());
 const mockCheckTrackedSearchForPriceDrop = vi.hoisted(() => vi.fn());
@@ -23,7 +28,7 @@ beforeEach(() => {
 describe("POST /api/cron/check-price-drops", () => {
   it("only queries tracked searches with a departure date today or later", async () => {
     mockFindMany.mockResolvedValueOnce([]);
-    await POST();
+    await POST(makeRequest());
     expect(mockFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { departureDate: { gte: expect.any(String) } },
@@ -38,7 +43,7 @@ describe("POST /api/cron/check-price-drops", () => {
       .mockResolvedValueOnce({ trackedSearchId: "trk_2", checked: true, dropped: false })
       .mockResolvedValueOnce({ trackedSearchId: "trk_3", checked: false, dropped: false });
 
-    const res = await POST();
+    const res = await POST(makeRequest());
     const body = await res.json();
 
     expect(res.status).toBe(200);
@@ -51,7 +56,7 @@ describe("POST /api/cron/check-price-drops", () => {
       .mockRejectedValueOnce(new Error("Duffel timeout"))
       .mockResolvedValueOnce({ trackedSearchId: "trk_2", checked: true, dropped: true });
 
-    const res = await POST();
+    const res = await POST(makeRequest());
     const body = await res.json();
 
     expect(res.status).toBe(200);
