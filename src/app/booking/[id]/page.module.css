@@ -93,6 +93,63 @@
   letter-spacing: 0.07em;
 }
 
+.statusOk {
+  font-size: 0.88rem;
+  color: var(--success);
+  margin: 0;
+}
+
+.statusUnavailable {
+  font-size: 0.88rem;
+  color: var(--text-3);
+  margin: 0;
+}
+
+.statusChanged {
+  font-size: 0.88rem;
+  color: #854d0e;
+  margin: 0 0 0.6rem;
+  font-weight: 600;
+}
+
+.statusPending {
+  font-size: 0.82rem;
+  color: var(--danger);
+  margin: 0.75rem 0 0;
+}
+
+.scheduleChangeRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border-glass);
+}
+
+.scheduleChangeRow:first-of-type {
+  border-top: none;
+}
+
+.scheduleChangeFlight {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.scheduleChangeTimes {
+  font-size: 0.85rem;
+}
+
+.scheduleChangeOld {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.scheduleChangeNew {
+  color: var(--text-1);
+  font-weight: 600;
+}
+
 .refRow {
   display: flex;
   justify-content: space-between;

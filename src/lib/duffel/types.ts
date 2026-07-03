@@ -150,3 +150,42 @@ export interface RawOfferRequest {
   live_mode: boolean;
   offers: RawOffer[];
 }
+
+// Verified against live Duffel docs (https://duffel.com/docs/api/orders,
+// https://duffel.com/docs/api/airline-initiated-changes):
+// GET /air/orders/{id} returns the order's current slices/segments (same
+// shape as an offer's slices/segments - departing_at/arriving_at reflect the
+// airline's latest schedule) plus an `airline_initiated_changes` array. Each
+// change carries `added` (the new slices) and `removed` (the slices as they
+// were before the change), and an `action_taken` of "accepted" | "cancelled"
+// | "changed" | null - null means the change is still awaiting a decision.
+export interface RawAirlineInitiatedChange {
+  id: string;
+  order_id: string;
+  action_taken: "accepted" | "cancelled" | "changed" | null;
+  created_at: string;
+  expires_at?: string | null;
+  added: RawSlice[];
+  removed: RawSlice[];
+}
+
+export interface RawOrder {
+  id: string;
+  booking_reference: string;
+  live_mode: boolean;
+  slices: RawSlice[];
+  airline_initiated_changes?: RawAirlineInitiatedChange[];
+}
+
+export interface NormalizedAirlineInitiatedChange {
+  id: string;
+  actionTaken: "accepted" | "cancelled" | "changed" | null;
+  createdAt: string;
+}
+
+export interface NormalizedOrder {
+  id: string;
+  bookingReference: string;
+  slices: NormalizedSlice[];
+  airlineInitiatedChanges: NormalizedAirlineInitiatedChange[];
+}

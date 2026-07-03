@@ -293,6 +293,37 @@
   width: 100%;
 }
 
+.trackPriceRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+.trackPriceBtn {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  border-radius: var(--r-full);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.trackPriceBtn:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+}
+
+.trackPriceBtn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 .suggestions {
   display: flex;
   flex-wrap: wrap;

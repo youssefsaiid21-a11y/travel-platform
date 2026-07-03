@@ -1,7 +1,7 @@
 import type { NormalizedOffer } from "@/lib/duffel/types";
-import { sendConfirmationEmail } from "./email";
-import { sendConfirmationSms } from "./sms";
-import { sendConfirmationWhatsApp } from "./whatsapp";
+import { sendConfirmationEmail, sendPriceDropEmail } from "./email";
+import { sendConfirmationSms, sendPriceDropSms } from "./sms";
+import { sendConfirmationWhatsApp, sendPriceDropWhatsApp } from "./whatsapp";
 
 export interface BookingNotificationData {
   bookingId: string;
@@ -66,5 +66,31 @@ export async function sendBookingConfirmations(booking: Parameters<typeof buildN
     sendConfirmationEmail(data),
     sendConfirmationSms(data),
     sendConfirmationWhatsApp(data),
+  ]);
+}
+
+export interface PriceDropNotificationData {
+  trackedSearchId: string;
+  origin: string;
+  destination: string;
+  departureDate: string;
+  returnDate: string | null;
+  previousAmount: string;
+  previousCurrency: string;
+  newAmount: string;
+  newCurrency: string;
+  userEmail: string;
+  userPhone: string | null;
+  appUrl: string;
+}
+
+// Same "fire all three, don't let one failure block the others" shape as
+// sendBookingConfirmations - each channel function gracefully no-ops when
+// its env vars aren't configured (see email.ts/sms.ts/whatsapp.ts).
+export async function sendPriceDropAlert(data: PriceDropNotificationData): Promise<void> {
+  await Promise.allSettled([
+    sendPriceDropEmail(data),
+    sendPriceDropSms(data),
+    sendPriceDropWhatsApp(data),
   ]);
 }

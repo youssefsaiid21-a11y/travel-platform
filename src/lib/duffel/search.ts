@@ -39,7 +39,10 @@ function normalizeSegment(seg: RawSegment): NormalizedSegment {
   };
 }
 
-function normalizeSlice(slice: RawSlice): NormalizedSlice {
+// Exported so other modules that receive raw Duffel slice data (e.g.
+// orders.ts, which shares the exact same slice/segment shape) don't
+// reimplement this normalization.
+export function normalizeSlice(slice: RawSlice): NormalizedSlice {
   const segments = slice.segments.map(normalizeSegment);
   return {
     duration: slice.duration,
