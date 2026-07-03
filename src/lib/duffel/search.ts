@@ -85,6 +85,16 @@ function normalizeService(service: RawService): NormalizedService {
   };
 }
 
+// Turns a raw refund/change condition into a fee, when Duffel discloses one.
+// Returns null (not just undefined) when the amount/currency aren't both
+// present, so callers can rely on "falsy = no known fee" without guessing.
+function normalizeFee(
+  condition: { penalty_amount?: string | null; penalty_currency?: string | null } | null | undefined
+): { amount: string; currency: string } | null {
+  if (!condition?.penalty_amount || !condition?.penalty_currency) return null;
+  return { amount: condition.penalty_amount, currency: condition.penalty_currency };
+}
+
 function normalizeOffer(offer: RawOffer): NormalizedOffer {
   return {
     id: offer.id,
@@ -102,6 +112,8 @@ function normalizeOffer(offer: RawOffer): NormalizedOffer {
     conditions: {
       refundable: offer.conditions.refund_before_departure?.allowed ?? false,
       changeable: offer.conditions.change_before_departure?.allowed ?? false,
+      refundFee: normalizeFee(offer.conditions.refund_before_departure),
+      changeFee: normalizeFee(offer.conditions.change_before_departure),
     },
     passengers: offer.passengers ?? [],
     includedBaggage: normalizeIncludedBaggage(offer),

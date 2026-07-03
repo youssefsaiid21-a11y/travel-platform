@@ -28,6 +28,11 @@ export interface NormalizedService {
   label: string;
 }
 
+export interface NormalizedFee {
+  amount: string;
+  currency: string;
+}
+
 export interface NormalizedOffer {
   id: string;
   expires_at: string;
@@ -37,7 +42,15 @@ export interface NormalizedOffer {
   tax_amount: string | null;
   owner: { iata_code: string; name: string; logo_symbol_url?: string };
   slices: NormalizedSlice[];
-  conditions: { refundable: boolean; changeable: boolean };
+  conditions: {
+    refundable: boolean;
+    changeable: boolean;
+    // Real penalty fee for refunding/changing before departure, when Duffel
+    // discloses it. undefined/null when the airline doesn't expose an amount
+    // (e.g. conditions unknown) - never fabricate a fee amount.
+    refundFee?: NormalizedFee | null;
+    changeFee?: NormalizedFee | null;
+  };
   passengers: Array<{ id: string; type: string }>;
   // Included (free) baggage allowance - undefined when the source data doesn't carry it
   includedBaggage?: NormalizedBaggageAllowance;
@@ -100,9 +113,22 @@ export interface RawSlice {
   segments: RawSegment[];
 }
 
+// Verified against live Duffel docs (https://duffel.com/docs/api/offers):
+// refund_before_departure / change_before_departure carry `allowed` plus
+// `penalty_amount` / `penalty_currency` when the airline discloses a fee.
+// Both the penalty fields and the whole condition object are treated as
+// optional/nullable here - not every fare/airline exposes a fee amount.
 export interface RawConditions {
-  refund_before_departure: { allowed: boolean } | null;
-  change_before_departure: { allowed: boolean } | null;
+  refund_before_departure: {
+    allowed: boolean;
+    penalty_amount?: string | null;
+    penalty_currency?: string | null;
+  } | null;
+  change_before_departure: {
+    allowed: boolean;
+    penalty_amount?: string | null;
+    penalty_currency?: string | null;
+  } | null;
 }
 
 export interface RawOffer {

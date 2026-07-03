@@ -85,6 +85,13 @@ function sliceLabels(offer: NormalizedOffer): Array<string | undefined> {
   });
 }
 
+// Returns the "· £75 fee" suffix when Duffel discloses a non-zero penalty
+// amount, otherwise "" so the badge falls back to its plain label.
+function feeSuffix(fee: NormalizedOffer["conditions"]["refundFee"]): string {
+  if (!fee || parseFloat(fee.amount) === 0) return "";
+  return ` · ${formatPrice(fee.amount, fee.currency)} fee`;
+}
+
 function baggageSummary(offer: NormalizedOffer): string | null {
   const bag = offer.includedBaggage;
   if (!bag) return null;
@@ -380,10 +387,14 @@ export function OfferCard({
       <div className={styles.footer}>
         <div className={styles.badges}>
           {offer.conditions.refundable && (
-            <span className={`${styles.badge} ${styles.badgeGreen}`}>Refundable</span>
+            <span className={`${styles.badge} ${styles.badgeGreen}`}>
+              Refundable{feeSuffix(offer.conditions.refundFee)}
+            </span>
           )}
           {offer.conditions.changeable && (
-            <span className={`${styles.badge} ${styles.badgeBlue}`}>Changeable</span>
+            <span className={`${styles.badge} ${styles.badgeBlue}`}>
+              Changeable{feeSuffix(offer.conditions.changeFee)}
+            </span>
           )}
           {!offer.conditions.refundable && (
             <span className={`${styles.badge} ${styles.badgeGray}`}>Non-refundable</span>

@@ -110,6 +110,104 @@ describe("included baggage normalization", () => {
   });
 });
 
+describe("refund/change fee normalization", () => {
+  it("surfaces penalty_amount/penalty_currency as refundFee/changeFee when Duffel discloses them", async () => {
+    const raw = makeRawOfferPayload({
+      conditions: {
+        refund_before_departure: {
+          allowed: true,
+          penalty_amount: "75.00",
+          penalty_currency: "GBP",
+        },
+        change_before_departure: {
+          allowed: true,
+          penalty_amount: "50.00",
+          penalty_currency: "GBP",
+        },
+      },
+    });
+    vi.mocked(duffelRequest).mockResolvedValueOnce({ offers: [raw] });
+
+    const params: SearchParams = {
+      origin: "LHR",
+      destination: "JFK",
+      departure_date: "2026-10-01",
+      passengers: [{ type: "adult", count: 1 }],
+    };
+
+    const offers = await createOfferRequest(params);
+    expect(offers[0].conditions).toEqual({
+      refundable: true,
+      changeable: true,
+      refundFee: { amount: "75.00", currency: "GBP" },
+      changeFee: { amount: "50.00", currency: "GBP" },
+    });
+  });
+
+  it("is null when Duffel doesn't disclose a penalty amount, but allowed is still surfaced via the booleans", async () => {
+    const raw = makeRawOfferPayload({
+      conditions: {
+        refund_before_departure: { allowed: true },
+        change_before_departure: { allowed: false },
+      },
+    });
+    vi.mocked(duffelRequest).mockResolvedValueOnce({ offers: [raw] });
+
+    const params: SearchParams = {
+      origin: "LHR",
+      destination: "JFK",
+      departure_date: "2026-10-01",
+      passengers: [{ type: "adult", count: 1 }],
+    };
+
+    const offers = await createOfferRequest(params);
+    expect(offers[0].conditions.refundable).toBe(true);
+    expect(offers[0].conditions.changeable).toBe(false);
+    expect(offers[0].conditions.refundFee).toBeNull();
+    expect(offers[0].conditions.changeFee).toBeNull();
+  });
+
+  it("is null when the whole condition object is null (existing refundable/changeable behavior unaffected)", async () => {
+    const raw = makeRawOfferPayload({
+      conditions: {
+        refund_before_departure: null,
+        change_before_departure: null,
+      },
+    });
+    vi.mocked(duffelRequest).mockResolvedValueOnce({ offers: [raw] });
+
+    const params: SearchParams = {
+      origin: "LHR",
+      destination: "JFK",
+      departure_date: "2026-10-01",
+      passengers: [{ type: "adult", count: 1 }],
+    };
+
+    const offers = await createOfferRequest(params);
+    expect(offers[0].conditions.refundable).toBe(false);
+    expect(offers[0].conditions.changeable).toBe(false);
+    expect(offers[0].conditions.refundFee).toBeNull();
+    expect(offers[0].conditions.changeFee).toBeNull();
+  });
+
+  it("existing refundable: false / changeable: false fixture still normalizes unchanged", async () => {
+    vi.mocked(duffelRequest).mockResolvedValueOnce({
+      offers: [makeRawOfferPayload()],
+    });
+
+    const params: SearchParams = {
+      origin: "LHR",
+      destination: "JFK",
+      departure_date: "2026-10-01",
+      passengers: [{ type: "adult", count: 1 }],
+    };
+
+    const offers = await createOfferRequest(params);
+    expect(offers[0].conditions.refundable).toBe(false);
+    expect(offers[0].conditions.changeable).toBe(false);
+  });
+});
+
 describe("getOfferWithServices", () => {
   it("requests return_available_services and normalizes services", async () => {
     vi.mocked(duffelRequest).mockResolvedValueOnce(
