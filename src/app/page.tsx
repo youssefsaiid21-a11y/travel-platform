@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { OfferList } from "@/components/OfferList";
 import { OfferCardSkeleton } from "@/components/OfferCard";
-import { PriceCalendar } from "@/components/PriceCalendar";
+import { PriceCalendarSection } from "@/components/PriceCalendarSection";
+import { ExploreResults } from "@/components/ExploreResults";
 import type { ChatResponse } from "@/app/api/chat/route";
 import type { NormalizedOffer } from "@/lib/duffel/types";
 import type { PriceCalendarEntry } from "@/lib/duffel/search";
-import type { SearchParams } from "@/lib/parser/types";
+import type { ExploreDestinationResult, ExploreParams, SearchParams } from "@/lib/parser/types";
 import styles from "./page.module.css";
 
 interface Message {
@@ -19,6 +20,8 @@ interface Message {
   searchParams?: SearchParams | null;
   priceCalendar?: PriceCalendarEntry[];
   searchFailed?: boolean;
+  exploreResults?: ExploreDestinationResult[];
+  exploreParams?: ExploreParams;
 }
 
 const EXAMPLE_QUERIES = [
@@ -26,6 +29,7 @@ const EXAMPLE_QUERIES = [
   "Return Paris → Tokyo, March 10 back March 20, business",
   "Non-stop Sydney to London in August",
   "3 passengers Toronto to Amsterdam Sep 1st",
+  "Cheap flights from London this weekend, anywhere",
 ];
 
 const POPULAR_ROUTES = [
@@ -96,6 +100,9 @@ function getParseErrorSuggestions(params: SearchParams | null | undefined): stri
 }
 
 function pickSuggestions(msg: Message): string[] | null {
+  // Explore-anywhere mode has its own ranked results and reply - generic
+  // "try a week later"/parse-error chips don't apply here.
+  if (msg.exploreResults !== undefined) return null;
   if (msg.offers === undefined) return null;           // network/SSE error - no hints
   if (msg.offers.length > 0) return getSmartSuggestions(msg.offers, msg.searchParams);
   // The search itself was invalid/failed (bad params, Duffel error) - "try a
@@ -213,6 +220,8 @@ export default function Home() {
                     searchParams: body.search_params,
                     priceCalendar: body.price_calendar,
                     searchFailed: body.search_failed,
+                    exploreResults: body.explore_results,
+                    exploreParams: body.explore_params,
                   },
                 ]);
                 // Save to recent searches if offers were returned
@@ -389,11 +398,28 @@ export default function Home() {
               <div className={styles.assistantBubble}>
                 <p>{msg.content}</p>
               </div>
+              {isLastAssistant && msg.exploreResults && msg.exploreResults.length > 0 && (
+                <div className={styles.offers}>
+                  <ExploreResults
+                    results={msg.exploreResults}
+                    disabled={loading}
+                    onSelect={(destination) => {
+                      const p = msg.exploreParams;
+                      if (!p) return;
+                      const returnPart = p.return_date ? ` returning ${p.return_date}` : "";
+                      sendMessage(
+                        `${p.origin} to ${destination} on ${p.departure_date}${returnPart}`
+                      );
+                    }}
+                  />
+                </div>
+              )}
               {msg.offers && msg.offers.length > 0 && (
                 <div className={styles.offers}>
                   {isLastAssistant && msg.priceCalendar && msg.priceCalendar.length > 1 && msg.searchParams && (
-                    <PriceCalendar
+                    <PriceCalendarSection
                       entries={msg.priceCalendar}
+                      searchParams={msg.searchParams}
                       selectedDate={msg.searchParams.departure_date}
                       onSelectDate={(date) => {
                         const { departure_date, return_date } = msg.searchParams!;

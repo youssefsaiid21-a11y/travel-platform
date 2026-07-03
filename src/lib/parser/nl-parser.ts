@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { ConversationMessage, SearchParams } from "./types";
+import type { ConversationMessage, ExploreParams, SearchParams } from "./types";
 
 const client = new OpenAI({
   apiKey: process.env.ZHIPU_API_KEY ?? "",
@@ -47,7 +47,13 @@ const EXTRACT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
         },
         destination: {
           type: "string",
-          description: "Arrival airport IATA code (3 letters). Always use a real IATA code.",
+          description:
+            "Arrival airport IATA code (3 letters). Always use a real IATA code. " +
+            "Omit this field ENTIRELY (do not guess one) when the user has no specific " +
+            "destination in mind and wants to explore options - triggers: 'anywhere', " +
+            "'surprise me', 'where can I go', 'flights from X, anywhere', 'somewhere cheap'. " +
+            "This activates 'explore anywhere' mode, which searches many popular destinations " +
+            "and returns a ranked cheapest-first list instead of a single search.",
         },
         departure_date: {
           type: "string",
@@ -132,13 +138,23 @@ const EXTRACT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
             required: ["origin", "destination", "departure_date"],
           },
         },
+        max_budget: {
+          type: "number",
+          description:
+            "Maximum total price the user is willing to pay, as a plain number in the " +
+            "local currency (e.g. 'under £300' → 300, 'budget of $500' → 500). " +
+            "Mainly used for explore-anywhere mode to filter out pricier destinations. " +
+            "Omit if the user didn't mention a budget.",
+        },
         error: {
           type: "string",
           description:
             "Set this only if the message is not a flight search at all. Leave unset for valid searches.",
         },
       },
-      required: ["origin", "destination", "departure_date", "passengers"],
+      // destination is intentionally NOT required - omitting it is how the
+      // model signals "explore anywhere" mode (see its description above).
+      required: ["origin", "departure_date", "passengers"],
     },
   },
 };
@@ -163,6 +179,8 @@ Flight search rules:
 - For time preferences: 'after midnight' → depart_after '00:00' + depart_before '05:59'; 'morning' → depart_after '06:00' + depart_before '11:59'; 'afternoon' → depart_after '12:00' + depart_before '17:59'; 'evening' → depart_after '18:00' + depart_before '22:59'; 'overnight'/'red-eye' → depart_after '21:00'; 'before noon' → depart_before '11:59'; specific time like 'after 3pm' → depart_after '15:00'.
 - For seat/legroom/meal preferences, baggage requests, or specific seat numbers: ignore them (these are booked after selection, not searchable) and proceed with the flight search normally.
 - For multi-city trips (3+ different cities in one journey), put the first leg in origin/destination/departure_date and every subsequent leg in additional_slices, in order. Do not set return_date on a multi-city trip.
+- If the user has no specific destination in mind ('anywhere', 'surprise me', 'where can I go from London this weekend', 'somewhere cheap in Europe'), omit the destination field entirely - this triggers explore-anywhere mode, which searches many popular destinations and returns a ranked list. Still fill in origin, departure_date (and return_date if implied), passengers, cabin_class, and max_budget if a budget was mentioned.
+- If the user mentions a budget or price ceiling ('under £300', 'budget of $500', 'cheap flights'), set max_budget to the numeric amount when a specific number is given.
 - Always call one of the two tools - never reply in plain text.`;
 }
 
@@ -170,6 +188,10 @@ export interface ParseResult {
   params: SearchParams | null;
   error: string | null;
   answer: string | null; // non-null when the model answered a knowledge question
+  // Non-null when the user asked for a flight with no specific destination
+  // ("anywhere", "surprise me") - the caller should run explore-anywhere
+  // search instead of a normal single-destination search/validation.
+  exploreParams: ExploreParams | null;
 }
 
 export async function nlParse(
@@ -209,36 +231,37 @@ export async function nlParse(
 
   const toolCall = response.choices[0]?.message?.tool_calls?.[0];
   if (!toolCall || toolCall.type !== "function") {
-    return { params: null, error: "Could not parse flight search from your message.", answer: null };
+    return { params: null, error: "Could not parse flight search from your message.", answer: null, exploreParams: null };
   }
 
   const input = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
 
   if (toolCall.function.name === "answer_travel_question") {
-    return { params: null, error: null, answer: (input.answer as string) ?? "" };
+    return { params: null, error: null, answer: (input.answer as string) ?? "", exploreParams: null };
   }
 
   if (input.error) {
-    return { params: null, error: input.error as string, answer: null };
+    return { params: null, error: input.error as string, answer: null, exploreParams: null };
   }
 
   // The tool schema's "required" fields are a hint to the model, not an
   // enforced contract - an OpenAI-compatible proxy can still return a
   // tool call missing them. Fail with the same friendly message as an
   // unparseable message rather than crashing on `undefined.toUpperCase()`.
+  // Note: destination is deliberately NOT checked here - it's optional
+  // (omitting it is how explore-anywhere mode is triggered, handled below).
   if (
     typeof input.origin !== "string" ||
-    typeof input.destination !== "string" ||
     typeof input.departure_date !== "string"
   ) {
-    return { params: null, error: "Could not parse flight search from your message.", answer: null };
+    return { params: null, error: "Could not parse flight search from your message.", answer: null, exploreParams: null };
   }
 
   // A passenger entry naming a valid type but missing/malformed `count` still
   // means "at least one of them" - default to 1 rather than silently dropping
   // the whole entry (which would search for fewer passengers than requested).
   const rawPassengers = Array.isArray(input.passengers) ? input.passengers : [];
-  const passengers = rawPassengers
+  const parsedPassengers = rawPassengers
     .filter(
       (p): p is Record<string, unknown> =>
         typeof p === "object" && p !== null && typeof p.type === "string"
@@ -247,13 +270,34 @@ export async function nlParse(
       type: p.type as SearchParams["passengers"][number]["type"],
       count: typeof p.count === "number" && p.count > 0 ? p.count : 1,
     }));
+  const passengers = parsedPassengers.length > 0 ? parsedPassengers : [{ type: "adult" as const, count: 1 }];
+
+  const hasDestination = typeof input.destination === "string" && input.destination.trim() !== "";
+
+  // No destination given - the user wants to explore, not search a specific
+  // route. Skip the normal SearchParams path (and its IATA validation)
+  // entirely; the caller runs exploreDestinations() against a curated list
+  // of popular destinations instead.
+  if (!hasDestination) {
+    const exploreParams: ExploreParams = {
+      origin: input.origin.toUpperCase().slice(0, 3),
+      departure_date: input.departure_date,
+      ...(input.return_date ? { return_date: input.return_date as string } : {}),
+      passengers,
+      ...(input.cabin_class
+        ? { cabin_class: input.cabin_class as SearchParams["cabin_class"] }
+        : {}),
+      ...(typeof input.max_budget === "number" ? { max_budget: input.max_budget } : {}),
+    };
+    return { params: null, error: null, answer: null, exploreParams };
+  }
 
   const hasAdditionalSlices =
     Array.isArray(input.additional_slices) && input.additional_slices.length > 0;
 
   const params: SearchParams = {
     origin: input.origin.toUpperCase().slice(0, 3),
-    destination: input.destination.toUpperCase().slice(0, 3),
+    destination: (input.destination as string).toUpperCase().slice(0, 3),
     departure_date: input.departure_date,
     // A trip is either a return trip or a multi-city trip, never both - if the
     // model (or carried-forward state) produced a stale return_date alongside
@@ -261,7 +305,7 @@ export async function nlParse(
     ...(input.return_date && !hasAdditionalSlices
       ? { return_date: input.return_date as string }
       : {}),
-    passengers: passengers.length > 0 ? passengers : [{ type: "adult", count: 1 }],
+    passengers,
     ...(input.cabin_class
       ? { cabin_class: input.cabin_class as SearchParams["cabin_class"] }
       : {}),
@@ -288,7 +332,7 @@ export async function nlParse(
       : {}),
   };
 
-  return { params, error: null, answer: null };
+  return { params, error: null, answer: null, exploreParams: null };
 }
 
 export function validateParams(params: SearchParams): string | null {

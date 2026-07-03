@@ -355,6 +355,88 @@ describe("nlParse - 10 NL query fixtures", () => {
   });
 });
 
+describe("nlParse - explore anywhere (destination omitted)", () => {
+  beforeEach(() => {
+    mockCreate.mockReset();
+  });
+
+  it("builds exploreParams instead of params when destination is omitted", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        departure_date: "2026-07-04",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    const { params, error, answer, exploreParams } = await nlParse(
+      "Cheap flights from London this weekend, anywhere",
+      [],
+      null
+    );
+    expect(params).toBeNull();
+    expect(error).toBeNull();
+    expect(answer).toBeNull();
+    expect(exploreParams).toEqual({
+      origin: "LHR",
+      departure_date: "2026-07-04",
+      passengers: [{ type: "adult", count: 1 }],
+    });
+  });
+
+  it("carries max_budget, cabin_class and return_date into exploreParams when given", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        departure_date: "2026-08-01",
+        return_date: "2026-08-08",
+        cabin_class: "business",
+        max_budget: 300,
+        passengers: [{ type: "adult", count: 2 }],
+      })
+    );
+    const { exploreParams } = await nlParse(
+      "Business class flights from London for under £300, anywhere, leaving Aug 1 back Aug 8",
+      [],
+      null
+    );
+    expect(exploreParams).toEqual({
+      origin: "LHR",
+      departure_date: "2026-08-01",
+      return_date: "2026-08-08",
+      cabin_class: "business",
+      max_budget: 300,
+      passengers: [{ type: "adult", count: 2 }],
+    });
+  });
+
+  it("treats an empty-string destination the same as an omitted one", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        destination: "",
+        departure_date: "2026-07-04",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    const { params, exploreParams } = await nlParse("Anywhere from London this weekend", [], null);
+    expect(params).toBeNull();
+    expect(exploreParams?.origin).toBe("LHR");
+  });
+
+  it("still requires origin even in explore mode - fails gracefully if missing", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        departure_date: "2026-07-04",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    const { params, exploreParams, error } = await nlParse("Anywhere this weekend", [], null);
+    expect(params).toBeNull();
+    expect(exploreParams).toBeNull();
+    expect(error).toBeTruthy();
+  });
+});
+
 describe("nlParse - knowledge questions (answer_travel_question)", () => {
   beforeEach(() => {
     mockCreate.mockReset();

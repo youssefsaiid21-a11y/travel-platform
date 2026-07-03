@@ -28,3 +28,24 @@ export interface ConversationMessage {
   role: "user" | "assistant";
   content: string;
 }
+
+// "Explore anywhere" mode: same shape as SearchParams minus destination
+// (which is deliberately absent - that's what triggers this mode instead of
+// a normal search) plus an optional budget ceiling used to filter results.
+export interface ExploreParams {
+  origin: string;
+  departure_date: string;
+  return_date?: string;
+  passengers: Array<{ type: "adult" | "child" | "infant"; count: number }>;
+  cabin_class?: "economy" | "premium_economy" | "business" | "first";
+  max_budget?: number;
+}
+
+export interface ExploreDestinationResult {
+  destination: string;
+  city: string;
+  country: string;
+  cheapestAmount: string;
+  currency: string;
+  airline: string;
+}

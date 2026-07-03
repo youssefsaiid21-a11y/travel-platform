@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { nlParse, validateParams, generateSearchReply } from "@/lib/parser/nl-parser";
 import { searchWithFallback, filterByPreferences, getPriceCalendar } from "@/lib/duffel/search";
 import type { PriceCalendarEntry } from "@/lib/duffel/search";
+import { exploreDestinations } from "@/lib/duffel/explore";
 import { getOrCreate, save } from "@/lib/session/store";
 import { DuffelError } from "@/lib/duffel/client";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import type { NormalizedOffer } from "@/lib/duffel/types";
-import type { SearchParams } from "@/lib/parser/types";
+import type { ExploreDestinationResult, ExploreParams, SearchParams } from "@/lib/parser/types";
 
 export interface ChatRequest {
   message: string;
@@ -24,6 +25,12 @@ export interface ChatResponse {
   // error) - as opposed to a valid search that legitimately found 0 offers.
   // Lets the client show "fix your search" hints instead of "no results" ones.
   search_failed?: boolean;
+  // Populated instead of offers/search_params when the user asked for a
+  // flight with no specific destination ("anywhere") - a ranked list of
+  // cheapest popular destinations, plus the params used to search them (so
+  // the client can start a normal search when the user picks one).
+  explore_results?: ExploreDestinationResult[];
+  explore_params?: ExploreParams;
 }
 
 function sse(event: string, data: object): string {
@@ -61,7 +68,7 @@ export async function POST(req: NextRequest) {
         // ── Step 1: parse ──────────────────────────────────────────────
         push("status", { step: "parsing", message: "Understanding your request…" });
 
-        const { params, error, answer } = await nlParse(
+        const { params, error, answer, exploreParams } = await nlParse(
           message.trim(),
           session.history,
           session.last_params
@@ -77,6 +84,45 @@ export async function POST(req: NextRequest) {
             offers: [],
             reply: answer,
             search_params: null,
+          } satisfies ChatResponse);
+          controller.close();
+          return;
+        }
+
+        // No specific destination - "explore anywhere" mode. Skips
+        // validateParams entirely (there's no single destination to
+        // validate) and fans out to exploreDestinations() instead of
+        // searchWithFallback().
+        if (exploreParams) {
+          push("status", {
+            step: "searching",
+            message: `Searching popular destinations from ${exploreParams.origin}…`,
+          });
+
+          let exploreResults: ExploreDestinationResult[] = [];
+          try {
+            exploreResults = await exploreDestinations(exploreParams);
+          } catch {
+            // Fall through with an empty list - reported as "no results"
+            // below rather than a hard error, since individual destination
+            // failures are already swallowed inside exploreDestinations.
+          }
+
+          const reply =
+            exploreResults.length > 0
+              ? `Found ${exploreResults.length} destination${exploreResults.length !== 1 ? "s" : ""} from ${exploreParams.origin} on ${exploreParams.departure_date}. Cheapest: ${exploreResults[0].city} from ${exploreResults[0].cheapestAmount} ${exploreResults[0].currency}.`
+              : `I couldn't find any flights from ${exploreParams.origin} around ${exploreParams.departure_date}. Try a different date or budget.`;
+
+          session.history.push({ role: "user", content: message.trim() });
+          session.history.push({ role: "assistant", content: reply });
+          await save(session);
+          push("done", {
+            session_id: session.id,
+            offers: [],
+            reply,
+            search_params: null,
+            explore_results: exploreResults,
+            explore_params: exploreParams,
           } satisfies ChatResponse);
           controller.close();
           return;

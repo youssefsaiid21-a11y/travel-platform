@@ -1,0 +1,57 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border-solid);
+  border-radius: var(--r-md);
+  background: var(--surface-raised);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.card:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.card:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.rank {
+  font-size: 0.65rem;
+  color: var(--text-3);
+}
+
+.city {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.country {
+  font-size: 0.7rem;
+  color: var(--text-3);
+}
+
+.price {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.airline {
+  font-size: 0.68rem;
+  color: var(--text-3);
+}
