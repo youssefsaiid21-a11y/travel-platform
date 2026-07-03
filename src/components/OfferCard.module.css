@@ -541,3 +541,159 @@
   justify-content: space-between;
   gap: 1rem;
 }
+
+/* ── Seat map picker ── */
+.seatMapPicker {
+  padding: 0.35rem 1rem 0;
+}
+
+.seatMapPanel {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  font-size: 0.75rem;
+  color: var(--text-2);
+}
+
+.seatMapSegment {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.seatSegmentLabel {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.seatCabin {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.6rem;
+  background: rgba(2, 132, 199, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow-x: auto;
+}
+
+.seatCabinLabel {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: capitalize;
+}
+
+.seatGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: fit-content;
+}
+
+.seatRow {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.seatSection {
+  display: flex;
+  gap: 3px;
+}
+
+.seatSection + .seatSection {
+  margin-left: 10px;
+}
+
+.seatBtn,
+.seatTaken,
+.seatGap {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: var(--r-sm);
+  font-size: 0.6rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.seatBtn {
+  background: var(--surface-solid);
+  border: 1px solid var(--accent-border);
+  color: var(--accent-dark);
+  cursor: pointer;
+  transition: background 0.12s, transform 0.12s;
+}
+
+.seatBtn:hover:not(:disabled) {
+  background: var(--accent-bg);
+  transform: scale(1.08);
+}
+
+.seatBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.seatBtnSelected {
+  background: var(--gradient-accent);
+  border-color: transparent;
+  color: #fff;
+}
+
+.seatTaken {
+  background: rgba(107, 114, 128, 0.1);
+  border: 1px solid transparent;
+  color: #9ca3af;
+}
+
+.seatGap {
+  background: transparent;
+}
+
+.seatLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.68rem;
+  color: var(--text-3);
+}
+
+.seatLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.legendSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.legendAvailable {
+  background: var(--surface-solid);
+  border: 1px solid var(--accent-border);
+}
+
+.legendSelected {
+  background: var(--gradient-accent);
+}
+
+.legendTaken {
+  background: rgba(107, 114, 128, 0.1);
+}
+
+.seatSelectionSummary {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent-dark);
+}
