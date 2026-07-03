@@ -150,3 +150,90 @@ export interface RawOfferRequest {
   live_mode: boolean;
   offers: RawOffer[];
 }
+
+// Seat maps - verified against live Duffel docs (https://duffel.com/docs/api/seat-maps
+// and https://duffel.com/docs/guides/adding-seats):
+// GET /air/seat_maps?offer_id={id} returns `data: SeatMap[]` (one seat map per
+// segment). When a fare doesn't support seat selection at all, Duffel returns
+// an empty array rather than an error - never assume a non-empty response.
+export interface RawSeatAvailableService {
+  id: string;
+  passenger_id: string;
+  total_amount: string;
+  total_currency: string;
+}
+
+// `type` covers selectable seats plus non-seat cabin features the docs list:
+// "seat" | "empty" | "bassinet" | "exit_row" | "lavatory" | "galley".
+// A "seat" element with no (or empty) available_services is occupied/blocked,
+// not purchasable - only present so the grid renders with the right shape.
+export interface RawSeatElement {
+  type: string;
+  designator?: string;
+  name?: string;
+  disclosures?: string[];
+  available_services?: RawSeatAvailableService[];
+}
+
+export interface RawSeatSection {
+  elements: RawSeatElement[];
+}
+
+export interface RawSeatRow {
+  sections: RawSeatSection[];
+}
+
+export interface RawSeatCabin {
+  cabin_class?: string;
+  deck: number;
+  aisles: number;
+  rows: RawSeatRow[];
+  wings?: { first_row_index: number; last_row_index: number };
+}
+
+export interface RawSeatMap {
+  id: string;
+  segment_id: string;
+  slice_id: string;
+  cabins: RawSeatCabin[];
+}
+
+export interface NormalizedSeatOption {
+  serviceId: string;
+  passengerId: string;
+  amount: string;
+  currency: string;
+}
+
+export interface NormalizedSeatElement {
+  type: string;
+  designator?: string;
+  // A "seat" element is only actually selectable when it carries at least
+  // one available_service - occupied/blocked seats still appear (as type
+  // "seat") so the grid keeps its real shape, but aren't purchasable.
+  available: boolean;
+  disclosures: string[];
+  options: NormalizedSeatOption[];
+}
+
+export interface NormalizedSeatSection {
+  elements: NormalizedSeatElement[];
+}
+
+export interface NormalizedSeatRow {
+  sections: NormalizedSeatSection[];
+}
+
+export interface NormalizedSeatCabin {
+  cabinClass?: string;
+  deck: number;
+  aisles: number;
+  rows: NormalizedSeatRow[];
+}
+
+export interface NormalizedSeatMap {
+  id: string;
+  segmentId: string;
+  sliceId: string;
+  cabins: NormalizedSeatCabin[];
+}

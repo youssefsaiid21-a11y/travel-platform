@@ -2,11 +2,21 @@ import { duffelRequest } from "./client";
 import type {
   NormalizedBaggageAllowance,
   NormalizedOffer,
+  NormalizedSeatCabin,
+  NormalizedSeatElement,
+  NormalizedSeatMap,
+  NormalizedSeatRow,
+  NormalizedSeatSection,
   NormalizedSlice,
   NormalizedSegment,
   NormalizedService,
   RawOffer,
   RawOfferRequest,
+  RawSeatCabin,
+  RawSeatElement,
+  RawSeatMap,
+  RawSeatRow,
+  RawSeatSection,
   RawSegment,
   RawService,
   RawSlice,
@@ -182,6 +192,60 @@ export async function getOfferWithServices(
     params: { return_available_services: true },
   });
   return normalizeOffer(raw);
+}
+
+function normalizeSeatElement(el: RawSeatElement): NormalizedSeatElement {
+  const options = (el.available_services ?? []).map((s) => ({
+    serviceId: s.id,
+    passengerId: s.passenger_id,
+    amount: s.total_amount,
+    currency: s.total_currency,
+  }));
+  return {
+    type: el.type,
+    designator: el.designator,
+    available: el.type === "seat" && options.length > 0,
+    disclosures: el.disclosures ?? [],
+    options,
+  };
+}
+
+function normalizeSeatSection(section: RawSeatSection): NormalizedSeatSection {
+  return { elements: (section.elements ?? []).map(normalizeSeatElement) };
+}
+
+function normalizeSeatRow(row: RawSeatRow): NormalizedSeatRow {
+  return { sections: (row.sections ?? []).map(normalizeSeatSection) };
+}
+
+function normalizeSeatCabin(cabin: RawSeatCabin): NormalizedSeatCabin {
+  return {
+    cabinClass: cabin.cabin_class,
+    deck: cabin.deck,
+    aisles: cabin.aisles,
+    rows: (cabin.rows ?? []).map(normalizeSeatRow),
+  };
+}
+
+function normalizeSeatMap(seatMap: RawSeatMap): NormalizedSeatMap {
+  return {
+    id: seatMap.id,
+    segmentId: seatMap.segment_id,
+    sliceId: seatMap.slice_id,
+    cabins: (seatMap.cabins ?? []).map(normalizeSeatCabin),
+  };
+}
+
+// Fetches the seat map(s) for an offer - one per segment. Like
+// getOfferWithServices, this is an on-demand lookup triggered by the user
+// expanding seat selection, not part of the bulk search. Duffel returns an
+// empty array (not an error) when a fare doesn't support seat selection at
+// all, so callers should treat [] as a normal, expected outcome.
+export async function getSeatMap(offerId: string): Promise<NormalizedSeatMap[]> {
+  const raw = await duffelRequest<RawSeatMap[]>("/air/seat_maps", {
+    params: { offer_id: offerId },
+  });
+  return (raw ?? []).map(normalizeSeatMap);
 }
 
 function addDays(dateStr: string, days: number): string {

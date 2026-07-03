@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { NormalizedOffer, NormalizedService } from "@/lib/duffel/types";
+import type {
+  NormalizedOffer,
+  NormalizedSeatElement,
+  NormalizedSeatMap,
+  NormalizedService,
+} from "@/lib/duffel/types";
 import styles from "./OfferCard.module.css";
 
 export type OfferTag = "cheapest" | "fastest" | "best";
@@ -158,6 +163,205 @@ function BagSeatOptions({ offerId }: { offerId: string }) {
                 <span>{formatPrice(s.amount, s.currency)}</span>
               </div>
             ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type SeatMapState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "loaded"; seatMaps: NormalizedSeatMap[] }
+  | { status: "error" };
+
+interface SelectedSeat {
+  designator: string;
+  amount: string;
+  currency: string;
+}
+
+// A seat element can carry more than one available_service (one per
+// passenger, sometimes at different prices) - the picker is a single-adult
+// MVP with no booking/order wiring, so it just surfaces the cheapest option
+// rather than trying to model a per-passenger assignment flow.
+function cheapestOption(element: NormalizedSeatElement) {
+  if (element.options.length === 0) return undefined;
+  return [...element.options].sort(
+    (a, b) => parseFloat(a.amount) - parseFloat(b.amount)
+  )[0];
+}
+
+function SeatButton({
+  element,
+  segmentId,
+  selected,
+  onSelect,
+}: {
+  element: NormalizedSeatElement;
+  segmentId: string;
+  selected: boolean;
+  onSelect: (segmentId: string, seat: SelectedSeat) => void;
+}) {
+  // Non-seat elements (aisles/lavatories/galleys/exit rows/etc.) still need
+  // to occupy their grid position so rows line up - render an inert filler.
+  if (element.type !== "seat") {
+    return <div className={styles.seatGap} aria-hidden="true" />;
+  }
+
+  const { designator } = element;
+  // A "seat" element with no available_services (or no designator at all)
+  // is occupied/blocked - Duffel still returns it so the grid keeps its
+  // real shape, but it can't be selected.
+  if (!element.available || !designator) {
+    return (
+      <div
+        className={styles.seatTaken}
+        aria-label={designator ? `Seat ${designator} unavailable` : "Seat unavailable"}
+      >
+        {designator ?? ""}
+      </div>
+    );
+  }
+
+  const option = cheapestOption(element);
+
+  return (
+    <button
+      type="button"
+      className={`${styles.seatBtn} ${selected ? styles.seatBtnSelected : ""}`}
+      onClick={() =>
+        option &&
+        onSelect(segmentId, {
+          designator,
+          amount: option.amount,
+          currency: option.currency,
+        })
+      }
+      disabled={!option}
+      title={
+        option
+          ? `Seat ${designator} · ${formatPrice(option.amount, option.currency)}`
+          : `Seat ${designator}`
+      }
+      aria-pressed={selected}
+    >
+      {designator}
+    </button>
+  );
+}
+
+function SeatMapPicker({ offerId }: { offerId: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [state, setState] = useState<SeatMapState>({ status: "idle" });
+  const [selected, setSelected] = useState<Record<string, SelectedSeat>>({});
+
+  async function toggle() {
+    const next = !expanded;
+    setExpanded(next);
+    if (next && (state.status === "idle" || state.status === "error")) {
+      setState({ status: "loading" });
+      try {
+        const res = await fetch(`/api/offers/${offerId}/seat-map`);
+        if (!res.ok) throw new Error("request failed");
+        const data = (await res.json()) as { seatMaps: NormalizedSeatMap[] };
+        setState({ status: "loaded", seatMaps: data.seatMaps ?? [] });
+      } catch {
+        setState({ status: "error" });
+      }
+    }
+  }
+
+  function selectSeat(segmentId: string, seat: SelectedSeat) {
+    setSelected((prev) => {
+      if (prev[segmentId]?.designator === seat.designator) {
+        const rest = { ...prev };
+        delete rest[segmentId];
+        return rest;
+      }
+      return { ...prev, [segmentId]: seat };
+    });
+  }
+
+  const selectedList = Object.values(selected);
+
+  return (
+    <div className={styles.seatMapPicker}>
+      <button
+        className={styles.expandBtn}
+        onClick={toggle}
+        aria-expanded={expanded}
+      >
+        {expanded ? "Hide" : "View"} seat map
+      </button>
+      {expanded && (
+        <div className={styles.seatMapPanel} aria-live="polite">
+          {state.status === "loading" && <span>Loading seat map…</span>}
+          {state.status === "error" && (
+            <span>Couldn&apos;t load the seat map right now.</span>
+          )}
+          {state.status === "loaded" && state.seatMaps.length === 0 && (
+            <span>Seat selection isn&apos;t available for this fare.</span>
+          )}
+
+          {state.status === "loaded" && state.seatMaps.length > 0 && (
+            <>
+              {state.seatMaps.map((seatMap, mapIndex) => (
+                <div key={seatMap.id || mapIndex} className={styles.seatMapSegment}>
+                  {state.seatMaps.length > 1 && (
+                    <div className={styles.seatSegmentLabel}>
+                      Flight {mapIndex + 1}
+                    </div>
+                  )}
+                  {seatMap.cabins.length === 0 && (
+                    <span>No seat layout available for this segment.</span>
+                  )}
+                  {seatMap.cabins.map((cabin, cabinIndex) => (
+                    <div key={cabinIndex} className={styles.seatCabin}>
+                      {cabin.cabinClass && (
+                        <div className={styles.seatCabinLabel}>{cabin.cabinClass}</div>
+                      )}
+                      <div className={styles.seatGrid}>
+                        {cabin.rows.map((row, rowIndex) => (
+                          <div key={rowIndex} className={styles.seatRow}>
+                            {row.sections.map((section, sectionIndex) => (
+                              <div key={sectionIndex} className={styles.seatSection}>
+                                {section.elements.map((el, elIndex) => (
+                                  <SeatButton
+                                    key={elIndex}
+                                    element={el}
+                                    segmentId={seatMap.segmentId}
+                                    selected={
+                                      selected[seatMap.segmentId]?.designator === el.designator
+                                    }
+                                    onSelect={selectSeat}
+                                  />
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+
+              <div className={styles.seatLegend}>
+                <span><span className={`${styles.legendSwatch} ${styles.legendAvailable}`} /> Available</span>
+                <span><span className={`${styles.legendSwatch} ${styles.legendSelected}`} /> Selected</span>
+                <span><span className={`${styles.legendSwatch} ${styles.legendTaken}`} /> Unavailable</span>
+              </div>
+
+              {selectedList.length > 0 && (
+                <div className={styles.seatSelectionSummary}>
+                  Selected: {selectedList
+                    .map((s) => `${s.designator} (${formatPrice(s.amount, s.currency)})`)
+                    .join(", ")}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -383,6 +587,7 @@ export function OfferCard({
       )}
 
       <BagSeatOptions offerId={offer.id} />
+      <SeatMapPicker offerId={offer.id} />
 
       <div className={styles.footer}>
         <div className={styles.badges}>
