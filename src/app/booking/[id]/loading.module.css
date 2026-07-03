@@ -1,0 +1,69 @@
+@keyframes shimmer {
+  0% { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+
+.page {
+  flex: 1;
+  padding: 2rem 1rem 3rem;
+}
+
+.container {
+  max-width: 620px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.skel {
+  background: linear-gradient(
+    90deg,
+    rgba(2, 132, 199, 0.06) 25%,
+    rgba(2, 132, 199, 0.12) 37%,
+    rgba(2, 132, 199, 0.06) 63%
+  );
+  background-size: 1200px 100%;
+  animation: shimmer 1.4s ease infinite;
+  border-radius: var(--r-md);
+}
+
+.bannerSkeleton {
+  composes: skel;
+  height: 56px;
+  border-radius: var(--r-lg);
+}
+
+.card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--r-lg);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(16px) saturate(140%);
+}
+
+.rowSkeleton {
+  composes: skel;
+  height: 18px;
+  width: 70%;
+  margin-bottom: 0.6rem;
+}
+
+.rowSkeletonNarrow {
+  composes: skel;
+  height: 13px;
+  width: 45%;
+}
+
+.flightSkeleton {
+  composes: skel;
+  height: 80px;
+  width: 100%;
+}
+
+.priceSkeleton {
+  composes: skel;
+  height: 36px;
+  width: 140px;
+}

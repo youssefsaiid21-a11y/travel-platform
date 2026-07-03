@@ -1,0 +1,126 @@
+.wrapper {
+  width: 100%;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.controls::-webkit-scrollbar {
+  display: none;
+}
+
+.group {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-solid);
+  margin: 0 0.15rem;
+}
+
+.chip {
+  padding: 0.28rem 0.7rem;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--text-3);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+}
+
+.chip:hover {
+  border-color: var(--accent-border);
+  color: var(--accent);
+  background: rgba(2, 132, 199, 0.04);
+}
+
+.chip.active {
+  background: var(--gradient-accent);
+  border-color: transparent;
+  color: #fff;
+}
+
+.count {
+  font-size: 0.75rem;
+  color: var(--text-3);
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.priceRange {
+  font-size: 0.72rem;
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.empty {
+  font-size: 0.875rem;
+  color: var(--text-3);
+  padding: 0.75rem 0;
+}
+
+.clearBtn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: inherit;
+  font-weight: 500;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.showMore {
+  width: 100%;
+  padding: 0.6rem;
+  background: rgba(2, 132, 199, 0.03);
+  border: 1px dashed var(--accent-border);
+  border-radius: var(--r-lg);
+  color: var(--accent);
+  font-size: 0.825rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-top: 0.35rem;
+}
+
+.showMore:hover {
+  background: rgba(2, 132, 199, 0.07);
+  border-color: var(--accent);
+}
+
+.showLess {
+  width: 100%;
+  padding: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-size: 0.775rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.12s;
+  margin-top: 0.25rem;
+  font-family: inherit;
+}
+
+.showLess:hover {
+  color: var(--text-1);
+}

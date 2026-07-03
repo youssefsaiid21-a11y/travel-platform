@@ -1,0 +1,477 @@
+.page {
+  flex: 1;
+  padding: 2rem 1rem 3rem;
+}
+
+.container {
+  max-width: 580px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.heading {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-1);
+  margin: 0 0 0.25rem;
+  letter-spacing: -0.02em;
+}
+
+.card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--r-lg);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(16px) saturate(140%);
+}
+
+.cardTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin: 0 0 0.875rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+/* ── Account info rows ── */
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.rowLabel {
+  font-size: 0.875rem;
+  color: var(--text-3);
+}
+
+.rowValue {
+  font-size: 0.875rem;
+  color: var(--text-1);
+  font-weight: 500;
+}
+
+/* ── Passenger profile grid ── */
+.profileGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.875rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.fieldLabel {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.fieldValue {
+  font-size: 0.9rem;
+  color: var(--text-1);
+  font-weight: 500;
+}
+
+.profileFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.savedNote {
+  font-size: 0.75rem;
+  color: var(--text-3);
+}
+
+.profileActions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.editBtn {
+  background: none;
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.editBtn:hover {
+  background: var(--accent-bg);
+}
+
+.deleteBtn {
+  background: none;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  color: var(--danger);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.deleteBtn:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(220, 38, 38, 0.6);
+}
+
+.deleteBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.emptyNote {
+  font-size: 0.875rem;
+  color: var(--text-3);
+  line-height: 1.55;
+  margin: 0 0 0.875rem;
+}
+
+.emptyProfileWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ── Edit form ── */
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+}
+
+.formLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.formLabelFull {
+  grid-column: 1 / -1;
+}
+
+.formInput,
+.formSelect {
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--text-1);
+  background: var(--surface);
+  border: 1px solid var(--border-solid);
+  border-radius: var(--r-md);
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+
+.formInput:focus,
+.formSelect:focus {
+  border-color: var(--accent);
+}
+
+.formTextarea {
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--text-1);
+  background: var(--surface);
+  border: 1px solid var(--border-solid);
+  border-radius: var(--r-md);
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+
+.formTextarea:focus {
+  border-color: var(--accent);
+}
+
+.formError {
+  font-size: 0.825rem;
+  color: var(--danger);
+  margin: 0;
+}
+
+.editActions {
+  display: flex;
+  gap: 0.625rem;
+  align-items: center;
+}
+
+.saveBtn {
+  background: var(--gradient-accent);
+  color: #fff;
+  border: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.55rem 1.4rem;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+}
+
+.saveBtn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.saveBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cancelBtn {
+  background: none;
+  border: none;
+  font-size: 0.875rem;
+  color: var(--text-3);
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0.55rem 0.5rem;
+  transition: color 0.15s;
+}
+
+.cancelBtn:hover {
+  color: var(--text-1);
+}
+
+/* ── Inline name edit ── */
+.nameView {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.editLink {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+  transition: opacity 0.12s;
+  flex-shrink: 0;
+}
+
+.editLink:hover {
+  opacity: 0.75;
+}
+
+.nameEdit {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.nameInput {
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--text-1);
+  background: var(--surface);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--r-md);
+  padding: 0.3rem 0.6rem;
+  outline: none;
+  min-width: 0;
+  flex: 1;
+  max-width: 220px;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+}
+
+.nameSaveBtn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  transition: opacity 0.12s;
+  flex-shrink: 0;
+}
+
+.nameSaveBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.nameSaveBtn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.nameError {
+  font-size: 0.75rem;
+  color: var(--danger);
+  width: 100%;
+}
+
+.namePlaceholder {
+  color: var(--text-3);
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* ── Page heading row ── */
+.headingRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.bookingsLink {
+  font-size: 0.825rem;
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.bookingsLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── Sign out ── */
+.signOutBtn {
+  background: none;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  color: var(--danger);
+  font-family: inherit;
+  font-size: 0.825rem;
+  font-weight: 500;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  align-self: flex-start;
+}
+
+.signOutBtn:hover {
+  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(220, 38, 38, 0.55);
+}
+
+/* ── Password change ── */
+.pwCollapsed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pwSuccess {
+  font-size: 0.825rem;
+  color: var(--success);
+  font-weight: 500;
+}
+
+.pwFormGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pwWrap {
+  position: relative;
+  display: flex;
+}
+
+.pwWrap .formInput {
+  flex: 1;
+  padding-right: 2.5rem;
+}
+
+.pwShowBtn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  color: var(--text-3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+  border-radius: var(--r-sm);
+  transition: color 0.12s;
+}
+
+.pwShowBtn:hover {
+  color: var(--accent);
+}
+
+@media (max-width: 480px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .profileGrid {
+    grid-template-columns: 1fr;
+  }
+}

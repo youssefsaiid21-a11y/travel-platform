@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String           @id @default(cuid())
+  email            String           @unique
+  name             String?
+  passwordHash     String
+  createdAt        DateTime         @default(now())
+  bookings         Booking[]
+  passengerProfile PassengerProfile?
+}
+
+model PassengerProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  givenName       String
+  familyName      String
+  bornOn          String
+  gender          String
+  title           String
+  phone           String
+  specialRequests String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id])
+}
+
+model ChatSession {
+  id          String   @id
+  sessionData String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+model Booking {
+  id                    String   @id @default(cuid())
+  userId                String
+  duffelOrderId         String?
+  duffelBookingRef      String?
+  status                String   @default("pending")
+  totalAmount           String
+  totalCurrency         String
+  offerSnapshot         String
+  searchParams          String
+  passengerNames        String
+  stripePaymentIntentId String?
+  specialRequests       String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([stripePaymentIntentId])
+}

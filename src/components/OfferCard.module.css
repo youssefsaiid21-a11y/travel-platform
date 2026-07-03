@@ -1,0 +1,543 @@
+.card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--r-lg);
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+  backdrop-filter: blur(16px) saturate(160%);
+  box-shadow: var(--shadow-md);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0.875rem 1rem 0.625rem;
+}
+
+.airlineInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.airlineLabel {
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.priceBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+}
+
+.tag {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 0.18rem 0.5rem;
+  border-radius: var(--r-full);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.tag_cheapest {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.tag_fastest {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+}
+
+.tag_best {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.price {
+  font-size: 1.35rem;
+  font-weight: 700;
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.priceSub {
+  font-size: 0.65rem;
+  color: var(--text-3);
+}
+
+.pricePerPax {
+  font-size: 0.65rem;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Route slices ── */
+.slices {
+  border-top: 1px solid var(--border);
+}
+
+.slice {
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.slice:last-child {
+  border-bottom: none;
+}
+
+.sliceLabel {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 0.55rem;
+}
+
+.routeRow {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.endpoint {
+  display: flex;
+  flex-direction: column;
+  min-width: 52px;
+}
+
+.right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.time {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.plus1 {
+  font-size: 0.6rem;
+  color: var(--danger);
+  vertical-align: super;
+  font-weight: 700;
+}
+
+.iata {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-top: 0.2rem;
+}
+
+.city {
+  font-size: 0.68rem;
+  color: var(--text-3);
+  margin-top: 0.05rem;
+}
+
+.middle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.duration {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.track {
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 10px;
+}
+
+.trackLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--gradient-accent);
+  border-radius: 1px;
+  opacity: 0.3;
+}
+
+.stopDot {
+  position: absolute;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  background: var(--surface-solid);
+  border: 2px solid var(--accent-light);
+  border-radius: 50%;
+  z-index: 1;
+}
+
+.stops {
+  font-size: 0.68rem;
+  color: var(--text-3);
+}
+
+.airlineRow {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+}
+
+.airlineName,
+.flightNums {
+  font-size: 0.68rem;
+  color: var(--text-3);
+}
+
+/* ── Footer ── */
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.55rem 1rem;
+  background: rgba(2, 132, 199, 0.025);
+  border-top: 1px solid var(--border);
+}
+
+.badges {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 0.65rem;
+  font-weight: 500;
+  padding: 0.12rem 0.45rem;
+  border-radius: var(--r-full);
+}
+
+.badgeGreen {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.badgeBlue {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+}
+
+.badgeGray {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+}
+
+.selectBtn {
+  background: var(--gradient-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-full);
+  padding: 0.4rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s, transform 0.15s;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+}
+
+.selectBtn:hover {
+  opacity: 0.88;
+  transform: scale(1.04);
+}
+
+/* ── Mobile ── */
+@media (max-width: 480px) {
+  .header {
+    padding: 0.75rem 0.875rem 0.5rem;
+  }
+
+  .time {
+    font-size: 1.2rem;
+  }
+
+  .price {
+    font-size: 1.1rem;
+  }
+
+  .endpoint {
+    min-width: 42px;
+  }
+
+  .slice {
+    padding: 0.65rem 0.875rem;
+  }
+
+  .footer {
+    padding: 0.5rem 0.875rem;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .selectBtn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .airlineRow {
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+}
+
+/* ── Segment details expansion ── */
+.expandBtn {
+  background: none;
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  transition: background 0.12s;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.expandBtn:hover {
+  background: rgba(2, 132, 199, 0.06);
+}
+
+.chevron {
+  transition: transform 0.15s ease;
+  display: block;
+  flex-shrink: 0;
+}
+
+.chevronUp {
+  transform: rotate(180deg);
+}
+
+.segmentDetails {
+  margin-top: 0.6rem;
+  padding: 0.6rem 0.5rem 0.2rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.segmentRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+}
+
+.segDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface-raised);
+  outline: 1.5px solid var(--accent-light);
+  flex-shrink: 0;
+  margin-top: 0.3rem;
+}
+
+.segInfo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.5rem;
+  padding-bottom: 0.45rem;
+}
+
+.segTime {
+  font-size: 0.825rem;
+  font-weight: 700;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.segIata {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.segCity {
+  font-size: 0.7rem;
+  color: var(--text-3);
+  flex: 1;
+  min-width: 80px;
+}
+
+.segFlight {
+  font-size: 0.68rem;
+  color: var(--text-3);
+  width: 100%;
+}
+
+.layoverRow {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0 0 0.45rem;
+}
+
+.layoverLine {
+  width: 2px;
+  height: 20px;
+  background: var(--border);
+  border-radius: 1px;
+  margin-left: 3px;
+  flex-shrink: 0;
+}
+
+.layoverLabel {
+  font-size: 0.68rem;
+  color: var(--text-3);
+  font-style: italic;
+}
+
+/* ── Skeleton ── */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.skeletonLine {
+  border-radius: var(--r-sm);
+  background: linear-gradient(90deg, rgba(2, 132, 199, 0.06) 25%, rgba(2, 132, 199, 0.12) 50%, rgba(2, 132, 199, 0.06) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton .header {
+  padding: 0.875rem 1rem 0.625rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.skeletonAirline {
+  composes: skeletonLine;
+  height: 14px;
+  width: 100px;
+  border-radius: var(--r-sm);
+}
+
+.skeletonPrice {
+  composes: skeletonLine;
+  height: 20px;
+  width: 72px;
+  border-radius: var(--r-sm);
+}
+
+.skeletonRoute {
+  padding: 0.8rem 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.skeletonEndpoint {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.skeletonTime {
+  composes: skeletonLine;
+  height: 22px;
+  width: 48px;
+  border-radius: var(--r-sm);
+}
+
+.skeletonIata {
+  composes: skeletonLine;
+  height: 11px;
+  width: 32px;
+  border-radius: var(--r-sm);
+}
+
+.skeletonMiddle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.skeletonDuration {
+  composes: skeletonLine;
+  height: 11px;
+  width: 36px;
+  border-radius: var(--r-sm);
+}
+
+.skeletonTrack {
+  composes: skeletonLine;
+  height: 2px;
+  width: 100%;
+  border-radius: 1px;
+}
+
+/* ── Baggage & ancillary services ── */
+.baggageRow {
+  padding: 0.35rem 1rem 0;
+  font-size: 0.72rem;
+  color: var(--text-3);
+}
+
+.bagSeatOptions {
+  padding: 0.35rem 1rem 0;
+}
+
+.servicesList {
+  margin-top: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--text-2);
+}
+
+.serviceRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}

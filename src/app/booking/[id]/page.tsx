@@ -1,0 +1,221 @@
+import { auth } from "@/auth";
+import { db } from "@/lib/db";
+import { notFound, redirect } from "next/navigation";
+import type { Metadata } from "next";
+
+import type { NormalizedOffer } from "@/lib/duffel/types";
+import Link from "next/link";
+import { ShareButtons } from "@/components/ShareButtons";
+import { CopyRefBtn } from "@/components/CopyRefBtn";
+import { PrintBtn } from "@/components/PrintBtn";
+import styles from "./page.module.css";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const booking = await db.booking.findUnique({ where: { id }, select: { offerSnapshot: true, duffelBookingRef: true } });
+  const noindex = { robots: { index: false } };
+  if (!booking) return { title: "Booking · Orbi", ...noindex };
+  try {
+    const offer = JSON.parse(booking.offerSnapshot) as NormalizedOffer;
+    const seg0 = offer.slices[0].segments[0];
+    const segLast = offer.slices[0].segments[offer.slices[0].segments.length - 1];
+    const route = `${seg0.origin.iata_code} → ${segLast.destination.iata_code}`;
+    const ref = booking.duffelBookingRef ? ` · ${booking.duffelBookingRef}` : "";
+    return { title: `${route}${ref} · Orbi`, ...noindex };
+  } catch {
+    return { title: "Booking · Orbi", ...noindex };
+  }
+}
+
+function formatDateTime(dt: string) {
+  return new Date(dt).toLocaleString("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function fmtTime(dt: string) {
+  return new Date(dt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function fmtDuration(iso: string) {
+  const h = iso.match(/(\d+)H/)?.[1];
+  const m = iso.match(/(\d+)M/)?.[1];
+  return [h ? `${h}h` : "", m ? `${m}m` : ""].filter(Boolean).join(" ");
+}
+
+export default async function BookingDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { id } = await params;
+  const booking = await db.booking.findUnique({ where: { id } });
+
+  if (!booking || booking.userId !== session.user.id) notFound();
+
+  const offer = JSON.parse(booking.offerSnapshot) as NormalizedOffer;
+  const passengerNames = JSON.parse(booking.passengerNames) as string[];
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.container}>
+        <div className={styles.statusBanner} data-status={booking.status}>
+          {booking.status === "confirmed" ? (
+            <>
+              <svg className={styles.checkCircle} viewBox="0 0 26 26" aria-hidden="true">
+                <circle cx="13" cy="13" r="11" stroke="rgba(22,163,74,0.25)" strokeWidth="2" fill="none" />
+                <circle cx="13" cy="13" r="11" className={styles.checkCircleRing} />
+                <polyline points="7,13 11,17 19,9" className={styles.checkMark} />
+              </svg>
+              Booking confirmed
+            </>
+          ) : booking.status === "failed" ? (
+            <>
+              <span className={styles.statusIcon}>!</span>
+              Booking could not be completed - your payment was charged. Contact
+              support with reference below.
+            </>
+          ) : (
+            "Booking pending…"
+          )}
+        </div>
+
+        <div className={styles.card}>
+          <div className={styles.refRow}>
+            <span className={styles.refLabel}>Booking reference</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span className={styles.ref}>
+                {booking.duffelBookingRef ?? "-"}
+              </span>
+              {booking.duffelBookingRef && (
+                <CopyRefBtn value={booking.duffelBookingRef} />
+              )}
+            </div>
+          </div>
+          <div className={styles.refRow}>
+            <span className={styles.refLabel}>Booking ID</span>
+            <span className={styles.refId}>{booking.id}</span>
+          </div>
+        </div>
+
+        {offer.slices.map((slice, si) => {
+          const firstSeg = slice.segments[0];
+          const lastSeg = slice.segments[slice.segments.length - 1];
+          return (
+            <div key={si} className={styles.card}>
+              <div className={styles.flightMeta}>
+                <span className={styles.airline}>
+                  {offer.slices.length > 1
+                    ? si === 0 ? `${offer.owner.name} · Outbound` : `${offer.owner.name} · Return`
+                    : offer.owner.name}
+                </span>
+                <span className={styles.flightNum}>
+                  {firstSeg.marketing_carrier.iata_code}{firstSeg.flight_number}
+                </span>
+              </div>
+              <div className={styles.flightRoute}>
+                <div className={styles.flightEndpoint}>
+                  <span className={styles.flightTime}>{fmtTime(firstSeg.departing_at)}</span>
+                  <span className={styles.flightIata}>{firstSeg.origin.iata_code}</span>
+                  <span className={styles.flightCity}>{firstSeg.origin.name.split(" ").slice(0, 2).join(" ")}</span>
+                </div>
+                <div className={styles.flightMiddle}>
+                  <span className={styles.flightDur}>{fmtDuration(slice.duration)}</span>
+                  <div className={styles.flightLine} />
+                  <span className={styles.flightStops}>
+                    {slice.stops === 0 ? "Non-stop" : `${slice.stops} stop${slice.stops > 1 ? "s" : ""}`}
+                  </span>
+                </div>
+                <div className={`${styles.flightEndpoint} ${styles.flightEndpointRight}`}>
+                  <span className={styles.flightTime}>{fmtTime(lastSeg.arriving_at)}</span>
+                  <span className={styles.flightIata}>{lastSeg.destination.iata_code}</span>
+                  <span className={styles.flightCity}>{lastSeg.destination.name.split(" ").slice(0, 2).join(" ")}</span>
+                </div>
+              </div>
+              <div className={styles.flightDateRow}>
+                {formatDateTime(firstSeg.departing_at)}
+              </div>
+            </div>
+          );
+        })}
+
+        <div className={styles.card}>
+          <h2 className={styles.cardTitle}>Passengers</h2>
+          {passengerNames.map((name, i) => (
+            <p key={i} className={styles.passenger}>
+              {name}
+              {offer.passengers[i]?.type && (
+                <span className={styles.passengerType}>
+                  {" "}· {offer.passengers[i].type.charAt(0).toUpperCase() + offer.passengers[i].type.slice(1)}
+                </span>
+              )}
+            </p>
+          ))}
+        </div>
+
+        <div className={styles.card}>
+          <h2 className={styles.cardTitle}>Amount paid</h2>
+          <p className={styles.amount}>
+            {(() => {
+              try {
+                return new Intl.NumberFormat("en-GB", {
+                  style: "currency",
+                  currency: booking.totalCurrency,
+                  minimumFractionDigits: 2,
+                }).format(parseFloat(booking.totalAmount));
+              } catch {
+                return `${booking.totalAmount} ${booking.totalCurrency}`;
+              }
+            })()}
+          </p>
+        </div>
+
+        {booking.status === "confirmed" && (() => {
+          const outboundFirst = offer.slices[0].segments[0];
+          const outboundLast = offer.slices[0].segments[offer.slices[0].segments.length - 1];
+          const returnLast = offer.slices.length > 1
+            ? offer.slices[offer.slices.length - 1].segments.at(-1)
+            : null;
+          return (
+          <div className={`${styles.card} ${styles.noPrint}`}>
+            <ShareButtons
+              bookingRef={booking.duffelBookingRef}
+              route={`${outboundFirst.origin.iata_code} → ${(returnLast ?? outboundLast).destination.iata_code}`}
+              airline={offer.owner.name}
+              departsAt={formatDateTime(outboundFirst.departing_at)}
+              arrivesAt={formatDateTime((returnLast ?? outboundLast).arriving_at)}
+              passengers={passengerNames}
+              totalAmount={booking.totalAmount}
+              totalCurrency={booking.totalCurrency}
+            />
+          </div>
+          );
+        })()}
+
+        <p className={styles.bookedOn}>
+          Booked on {new Date(booking.createdAt).toLocaleDateString("en-GB", { dateStyle: "long" })}
+        </p>
+
+        <div className={styles.actions}>
+          <Link href="/" className={styles.backLink}>
+            ← New search
+          </Link>
+          <div className={styles.actionRight}>
+            <PrintBtn />
+            <Link href="/bookings" className={styles.historyLink}>
+              All bookings
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

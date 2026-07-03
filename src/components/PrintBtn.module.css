@@ -1,0 +1,28 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: 1px solid var(--border-glass);
+  color: var(--text-3);
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+  backdrop-filter: blur(8px);
+}
+
+.btn:hover {
+  color: var(--text-1);
+  background: rgba(0, 0, 0, 0.04);
+  border-color: var(--border);
+}
+
+@media print {
+  .btn {
+    display: none;
+  }
+}

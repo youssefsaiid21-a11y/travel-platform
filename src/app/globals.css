@@ -1,0 +1,170 @@
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/inter/800.css";
+
+:root {
+  /* Brand - sky blue: highest trust + sky/ocean association in travel UX research */
+ --accent: #0284c7;
+ --accent-light: #38bdf8;
+ --accent-dark: #0369a1;
+ --accent-bg: rgba(2, 132, 199, 0.08);
+ --accent-border: rgba(2, 132, 199, 0.25);
+
+  /* Gradients */
+ --gradient-accent: linear-gradient(135deg, #0284c7 0%, #06b6d4 100%);
+ --gradient-accent-vivid: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #0284c7 100%);
+
+  /* Surfaces - semi-transparent so aurora bleeds through */
+ --surface: rgba(255, 255, 255, 0.55);
+ --surface-raised: rgba(255, 255, 255, 0.78);
+ --surface-solid: #ffffff;
+
+  /* Text - deep navy tones complement sky palette */
+ --text-1: #0c1a2e;
+ --text-2: #1e3a5f;
+ --text-3: #5b8db0;
+
+  /* Borders */
+ --border: rgba(2, 132, 199, 0.08);
+ --border-solid: #bae6fd;
+ --border-glass: rgba(255, 255, 255, 0.65);
+
+  /* Shadows - neutral so they read on the blue background */
+ --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.06);
+ --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);
+ --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.05);
+ --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.06);
+ --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.06);
+ --shadow-glow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+
+  /* Radius */
+ --r-sm: 8px;
+ --r-md: 12px;
+ --r-lg: 16px;
+ --r-xl: 24px;
+ --r-full: 9999px;
+
+  /* Semantic */
+ --success: #059669;
+ --success-bg: rgba(5, 150, 105, 0.1);
+ --danger: #dc2626;
+ --danger-bg: rgba(220, 38, 38, 0.08);
+ --warn: #d97706;
+ --warn-bg: rgba(217, 119, 6, 0.08);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html {
+  height: 100%;
+ -webkit-text-size-adjust: 100%;
+}
+
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 1rem;
+  z-index: 9999;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 0 0 var(--r-md) var(--r-md);
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: top 0.1s;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-1);
+ -webkit-font-smoothing: antialiased;
+ -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  /* Aurora base - sky blue visible even before blobs paint */
+  background-color: #e0f2fe;
+}
+
+/* ── Aurora mesh gradient ──────────────────────────────
+   Sky-blue / cyan / teal blobs: sky at top, ocean at
+   bottom. Cards at 55-78% opacity let this bleed through
+   → real glassmorphism. Distinct from purple competitors.
+─────────────────────────────────────────────────────── */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-color: #e0f2fe;
+  background-image:
+    /* top-left sky blob */
+    radial-gradient(ellipse 75% 65% at -5% 0%,
+      rgba(14, 165, 233, 0.45) 0%,
+      transparent 60%),
+    /* top-right cyan blob */
+    radial-gradient(ellipse 65% 55% at 105% 5%,
+      rgba(6, 182, 212, 0.38) 0%,
+      transparent 60%),
+    /* bottom centre teal blob - horizon / ocean feel */
+    radial-gradient(ellipse 90% 55% at 50% 110%,
+      rgba(20, 184, 166, 0.28) 0%,
+      transparent 55%);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* ── Accessibility ── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
