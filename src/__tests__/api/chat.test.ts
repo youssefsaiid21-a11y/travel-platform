@@ -343,6 +343,24 @@ describe("POST /api/chat", () => {
     expect(body.search_params).toBeNull();
   });
 
+  it("explore-anywhere mode: rejects a past departure date before ever calling exploreDestinations", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        departure_date: "2020-01-01",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+
+    const res = await POST(makeRequest({ message: "Anywhere from London, Jan 1st 2020" }));
+    const body = await readSSE(res);
+
+    expect(body.reply).toMatch(/past/i);
+    expect(body.search_failed).toBe(true);
+    expect(body.explore_results).toBeUndefined();
+    expect(vi.mocked(exploreDestinations)).not.toHaveBeenCalled();
+  });
+
   it("offer prices are raw strings from Duffel - no computed price in response", async () => {
     mockCreate.mockResolvedValueOnce(
       makeToolResponse({

@@ -8,7 +8,7 @@ vi.mock("openai", () => ({
   },
 }));
 
-import { nlParse, validateParams } from "@/lib/parser/nl-parser";
+import { nlParse, validateParams, validateExploreParams } from "@/lib/parser/nl-parser";
 
 function makeToolResponse(args: Record<string, unknown>, toolName = "extract_flight_search") {
   return {
@@ -434,6 +434,45 @@ describe("nlParse - explore anywhere (destination omitted)", () => {
     expect(params).toBeNull();
     expect(exploreParams).toBeNull();
     expect(error).toBeTruthy();
+  });
+});
+
+describe("validateExploreParams - explore-anywhere input validation", () => {
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+  const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+
+  const base = {
+    origin: "LHR",
+    departure_date: tomorrow,
+    passengers: [{ type: "adult" as const, count: 1 }],
+  };
+
+  it("returns null for valid explore params", () => {
+    expect(validateExploreParams(base)).toBeNull();
+  });
+
+  it("rejects an invalid origin instead of letting it hit ~40 Duffel searches", () => {
+    const err = validateExploreParams({ ...base, origin: "12" });
+    expect(err).toMatch(/departure airport/i);
+  });
+
+  it("rejects a past departure date", () => {
+    const err = validateExploreParams({ ...base, departure_date: "2020-01-01" });
+    expect(err).toMatch(/past/i);
+  });
+
+  it("rejects a return_date before departure_date", () => {
+    const err = validateExploreParams({ ...base, return_date: "2020-01-01" });
+    expect(err).toMatch(/return date/i);
+  });
+
+  it("accepts a valid return_date after departure_date", () => {
+    expect(validateExploreParams({ ...base, return_date: nextWeek })).toBeNull();
+  });
+
+  it("rejects more than 9 passengers", () => {
+    const err = validateExploreParams({ ...base, passengers: [{ type: "adult" as const, count: 10 }] });
+    expect(err).toMatch(/9 passengers/i);
   });
 });
 

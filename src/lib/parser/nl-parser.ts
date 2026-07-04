@@ -398,6 +398,38 @@ export function validateParams(params: SearchParams): string | null {
   return null;
 }
 
+// Explore-anywhere skips validateParams entirely (there's no single
+// destination to validate), but the same class of bad input - an invalid
+// origin, a past date, a garbage passenger count - would otherwise sail
+// straight into ~40 parallel Duffel searches (one per candidate destination),
+// each failing individually and producing a misleading generic "no flights
+// found" reply instead of a clear, immediate error like the normal path gives.
+export function validateExploreParams(params: ExploreParams): string | null {
+  const today = new Date().toISOString().split("T")[0];
+
+  if (!/^[A-Z]{3}$/.test(params.origin)) {
+    return `I couldn't identify the departure airport (got "${params.origin}"). Could you be more specific - e.g. "London Heathrow" or use the airport code?`;
+  }
+
+  if (params.departure_date < today) {
+    return `That departure date (${params.departure_date}) is in the past. Which upcoming date did you mean?`;
+  }
+
+  if (params.return_date && params.return_date <= params.departure_date) {
+    return `The return date (${params.return_date}) must be after the departure date (${params.departure_date}). Can you clarify?`;
+  }
+
+  const totalPassengers = params.passengers.reduce((s, p) => s + p.count, 0);
+  if (totalPassengers < 1) {
+    return `At least 1 passenger is required.`;
+  }
+  if (totalPassengers > 9) {
+    return `Duffel supports up to 9 passengers per booking (you specified ${totalPassengers}).`;
+  }
+
+  return null;
+}
+
 export async function generateSearchReply(
   userMessage: string,
   params: SearchParams,

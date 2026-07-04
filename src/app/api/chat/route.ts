@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { nlParse, validateParams, generateSearchReply } from "@/lib/parser/nl-parser";
+import { nlParse, validateParams, validateExploreParams, generateSearchReply } from "@/lib/parser/nl-parser";
 import { searchWithFallback, filterByPreferences, getPriceCalendar } from "@/lib/duffel/search";
 import type { PriceCalendarEntry } from "@/lib/duffel/search";
 import { exploreDestinations } from "@/lib/duffel/explore";
@@ -90,10 +90,26 @@ export async function POST(req: NextRequest) {
         }
 
         // No specific destination - "explore anywhere" mode. Skips
-        // validateParams entirely (there's no single destination to
-        // validate) and fans out to exploreDestinations() instead of
-        // searchWithFallback().
+        // validateParams (there's no single destination to validate) but
+        // still validates origin/date/passengers via validateExploreParams,
+        // then fans out to exploreDestinations() instead of searchWithFallback().
         if (exploreParams) {
+          const exploreValidationError = validateExploreParams(exploreParams);
+          if (exploreValidationError) {
+            session.history.push({ role: "user", content: message.trim() });
+            session.history.push({ role: "assistant", content: exploreValidationError });
+            await save(session);
+            push("done", {
+              session_id: session.id,
+              offers: [],
+              reply: exploreValidationError,
+              search_params: null,
+              search_failed: true,
+            } satisfies ChatResponse);
+            controller.close();
+            return;
+          }
+
           push("status", {
             step: "searching",
             message: `Searching popular destinations from ${exploreParams.origin}…`,
