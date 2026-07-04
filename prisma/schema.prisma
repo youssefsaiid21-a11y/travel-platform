@@ -76,6 +76,16 @@ model TrackedSearch {
   // JSON-encoded SearchParams["passengers"], e.g. [{"type":"adult","count":1}]
   passengers        String
   cabinClass        String?
+  // Preference filters from the original search - carried over so the price
+  // re-check compares against the same filtered results the user actually
+  // saw (a "refundable nonstop" search must stay refundable/nonstop when
+  // re-priced, not silently drop those constraints and alert on an unrelated
+  // cheaper fare the user never asked for).
+  preferRefundable  Boolean  @default(false)
+  preferChangeable  Boolean  @default(false)
+  departAfter       String?
+  departBefore      String?
+  maxConnections    Int?
   lastKnownPrice    String
   lastKnownCurrency String
   createdAt         DateTime @default(now())

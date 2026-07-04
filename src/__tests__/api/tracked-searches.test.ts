@@ -104,6 +104,48 @@ describe("POST /api/tracked-searches", () => {
     });
     expect(mockCreate).not.toHaveBeenCalled();
   });
+
+  it("matches on passengers so tracking the same route with a different party size creates a new row", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: MOCK_USER_ID } });
+    mockFindFirst.mockResolvedValueOnce(null);
+    mockCreate.mockResolvedValueOnce({ id: "trk_family" });
+
+    const familyParams: SearchParams = {
+      ...SEARCH_PARAMS,
+      passengers: [{ type: "adult", count: 2 }, { type: "child", count: 3 }],
+    };
+
+    await POST(
+      makePostRequest({ searchParams: familyParams, cheapestAmount: "900.00", cheapestCurrency: "GBP" })
+    );
+
+    // The lookup must include passengers - otherwise this would match (and
+    // silently overwrite) an existing 1-adult tracked search for the same route/date.
+    expect(mockFindFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        passengers: JSON.stringify(familyParams.passengers),
+      }),
+    });
+  });
+
+  it("matches on preference filters so a refundable-only tracked search doesn't collide with a plain one", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: MOCK_USER_ID } });
+    mockFindFirst.mockResolvedValueOnce(null);
+    mockCreate.mockResolvedValueOnce({ id: "trk_refundable" });
+
+    const refundableParams: SearchParams = { ...SEARCH_PARAMS, prefer_refundable: true };
+
+    await POST(
+      makePostRequest({ searchParams: refundableParams, cheapestAmount: "450.00", cheapestCurrency: "GBP" })
+    );
+
+    expect(mockFindFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({ preferRefundable: true, preferChangeable: false }),
+    });
+    expect(mockCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ preferRefundable: true }),
+    });
+  });
 });
 
 describe("GET /api/tracked-searches", () => {

@@ -1,4 +1,4 @@
-import { createOfferRequest, rankOffers } from "@/lib/duffel/search";
+import { createOfferRequest, filterByPreferences, rankOffers } from "@/lib/duffel/search";
 import { sendPriceDropAlert } from "@/lib/notifications";
 import { db } from "@/lib/db";
 import type { SearchParams } from "@/lib/parser/types";
@@ -34,12 +34,20 @@ export interface TrackedSearchRow {
   returnDate: string | null;
   passengers: string; // JSON-encoded SearchParams["passengers"]
   cabinClass: string | null;
+  preferRefundable: boolean;
+  preferChangeable: boolean;
+  departAfter: string | null;
+  departBefore: string | null;
+  maxConnections: number | null;
   lastKnownPrice: string;
   lastKnownCurrency: string;
 }
 
-// Rebuilds the SearchParams shape createOfferRequest expects from the
-// flattened columns a TrackedSearch row is stored as.
+// Rebuilds the SearchParams shape createOfferRequest/filterByPreferences
+// expect from the flattened columns a TrackedSearch row is stored as. Must
+// include every preference filter the original search applied - otherwise
+// the re-check compares against a differently-filtered (and differently
+// priced) result set than what the user actually tracked.
 export function trackedSearchToSearchParams(tracked: TrackedSearchRow): SearchParams {
   return {
     origin: tracked.origin,
@@ -50,6 +58,11 @@ export function trackedSearchToSearchParams(tracked: TrackedSearchRow): SearchPa
     ...(tracked.cabinClass
       ? { cabin_class: tracked.cabinClass as SearchParams["cabin_class"] }
       : {}),
+    ...(tracked.preferRefundable ? { prefer_refundable: true } : {}),
+    ...(tracked.preferChangeable ? { prefer_changeable: true } : {}),
+    ...(tracked.departAfter ? { depart_after: tracked.departAfter } : {}),
+    ...(tracked.departBefore ? { depart_before: tracked.departBefore } : {}),
+    ...(tracked.maxConnections !== null ? { max_connections: tracked.maxConnections } : {}),
   };
 }
 
@@ -81,7 +94,11 @@ export async function checkTrackedSearchForPriceDrop(
 ): Promise<CheckOutcome> {
   const params = trackedSearchToSearchParams(tracked);
   const offers = await createOfferRequest(params);
-  const cheapest = rankOffers(offers)[0];
+  // Same preference filters as the original search - otherwise a "refundable
+  // nonstop" tracked search could alert on an unrelated, unfiltered cheaper
+  // fare the user never asked to be compared against.
+  const { offers: filtered } = filterByPreferences(offers, params);
+  const cheapest = rankOffers(filtered)[0];
 
   if (!cheapest) {
     return { trackedSearchId: tracked.id, checked: false, dropped: false };

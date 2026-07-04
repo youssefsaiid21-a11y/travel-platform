@@ -28,8 +28,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing current price" }, { status: 400 });
   }
 
+  const passengers = JSON.stringify(searchParams.passengers);
+
   // Avoid piling up duplicate rows if the user clicks "track" on the same
-  // search twice - refresh the existing row's price instead.
+  // search twice - refresh the existing row's price instead. Must match on
+  // every field that changes what's actually being tracked (passengers and
+  // preference filters included) - otherwise tracking "1 adult" then later
+  // "1 adult + 3 kids" for the same route/date would silently overwrite the
+  // first alert instead of creating a second one.
   const existing = await db.trackedSearch.findFirst({
     where: {
       userId: session.user.id,
@@ -37,7 +43,13 @@ export async function POST(req: NextRequest) {
       destination: searchParams.destination,
       departureDate: searchParams.departure_date,
       returnDate: searchParams.return_date ?? null,
+      passengers,
       cabinClass: searchParams.cabin_class ?? null,
+      preferRefundable: !!searchParams.prefer_refundable,
+      preferChangeable: !!searchParams.prefer_changeable,
+      departAfter: searchParams.depart_after ?? null,
+      departBefore: searchParams.depart_before ?? null,
+      maxConnections: searchParams.max_connections ?? null,
     },
   });
 
@@ -47,8 +59,13 @@ export async function POST(req: NextRequest) {
     destination: searchParams.destination,
     departureDate: searchParams.departure_date,
     returnDate: searchParams.return_date ?? null,
-    passengers: JSON.stringify(searchParams.passengers),
+    passengers,
     cabinClass: searchParams.cabin_class ?? null,
+    preferRefundable: !!searchParams.prefer_refundable,
+    preferChangeable: !!searchParams.prefer_changeable,
+    departAfter: searchParams.depart_after ?? null,
+    departBefore: searchParams.depart_before ?? null,
+    maxConnections: searchParams.max_connections ?? null,
     lastKnownPrice: cheapestAmount,
     lastKnownCurrency: cheapestCurrency,
   };

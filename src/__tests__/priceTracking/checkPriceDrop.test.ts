@@ -30,7 +30,12 @@ import {
   type TrackedSearchWithUser,
 } from "@/lib/priceTracking/checkPriceDrop";
 
-function makeOffer(id: string, totalAmount: string, currency = "GBP"): NormalizedOffer {
+function makeOffer(
+  id: string,
+  totalAmount: string,
+  currency = "GBP",
+  refundable = false
+): NormalizedOffer {
   return {
     id,
     expires_at: "2026-08-01T00:00:00Z",
@@ -57,7 +62,7 @@ function makeOffer(id: string, totalAmount: string, currency = "GBP"): Normalize
         ],
       },
     ],
-    conditions: { refundable: false, changeable: false },
+    conditions: { refundable, changeable: false },
     passengers: [{ id: "pas_1", type: "adult" }],
   };
 }
@@ -71,6 +76,11 @@ function makeTracked(overrides: Partial<TrackedSearchWithUser> = {}): TrackedSea
     returnDate: null,
     passengers: JSON.stringify([{ type: "adult", count: 1 }]),
     cabinClass: null,
+    preferRefundable: false,
+    preferChangeable: false,
+    departAfter: null,
+    departBefore: null,
+    maxConnections: null,
     lastKnownPrice: "300.00",
     lastKnownCurrency: "GBP",
     user: { email: "traveler@example.com", passengerProfile: { phone: "+441234567890" } },
@@ -117,6 +127,23 @@ describe("trackedSearchToSearchParams", () => {
     );
     expect(params.return_date).toBe("2026-10-10");
     expect(params.cabin_class).toBe("business");
+  });
+
+  it("carries over every preference filter the original search applied", () => {
+    const params = trackedSearchToSearchParams(
+      makeTracked({
+        preferRefundable: true,
+        preferChangeable: true,
+        departAfter: "18:00",
+        departBefore: "22:59",
+        maxConnections: 0,
+      })
+    );
+    expect(params.prefer_refundable).toBe(true);
+    expect(params.prefer_changeable).toBe(true);
+    expect(params.depart_after).toBe("18:00");
+    expect(params.depart_before).toBe("22:59");
+    expect(params.max_connections).toBe(0);
   });
 });
 
@@ -188,5 +215,24 @@ describe("checkTrackedSearchForPriceDrop", () => {
 
     expect(outcome.newAmount).toBe("199.00");
     expect(outcome.dropped).toBe(true);
+  });
+
+  it("applies the tracked search's own preference filters instead of comparing against an unfiltered cheapest", async () => {
+    // Cheapest overall is non-refundable; only the pricier offer is refundable.
+    mockCreateOfferRequest.mockResolvedValueOnce([
+      makeOffer("cheap_nonref", "150.00", "GBP", false),
+      makeOffer("pricier_ref", "280.00", "GBP", true),
+    ]);
+
+    const tracked = makeTracked({
+      preferRefundable: true,
+      lastKnownPrice: "300.00",
+      lastKnownCurrency: "GBP",
+    });
+    const outcome = await checkTrackedSearchForPriceDrop(tracked);
+
+    // Must compare against the refundable £280 fare, not the £150 one that
+    // "refundable only" would have excluded from the original tracked search.
+    expect(outcome.newAmount).toBe("280.00");
   });
 });
