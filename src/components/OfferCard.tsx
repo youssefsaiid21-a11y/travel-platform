@@ -238,6 +238,11 @@ function SeatButton({
           ? `Seat ${designator} · ${formatPrice(option.amount, option.currency)}`
           : `Seat ${designator}`
       }
+      aria-label={
+        option
+          ? `Seat ${designator}, ${formatPrice(option.amount, option.currency)}`
+          : `Seat ${designator}`
+      }
       aria-pressed={selected}
     >
       {designator}
