@@ -1,6 +1,7 @@
 import { createOfferRequest, filterByPreferences, rankOffers } from "@/lib/duffel/search";
 import { sendPriceDropAlert } from "@/lib/notifications";
 import { db } from "@/lib/db";
+import type { NormalizedOffer } from "@/lib/duffel/types";
 import type { SearchParams } from "@/lib/parser/types";
 
 export interface PriceComparisonResult {
@@ -66,6 +67,29 @@ export function trackedSearchToSearchParams(tracked: TrackedSearchRow): SearchPa
   };
 }
 
+// filterByPreferences() is built for the interactive chat UI, where falling
+// back to the unfiltered offer list (with an explanatory note) when a
+// preference matches nothing is the right UX - showing something beats
+// showing nothing. That fallback is wrong for this automated comparison: it
+// would silently compare against a fare that doesn't actually satisfy the
+// preference the user tracked (e.g. alerting on a cheaper *non-refundable*
+// fare for a search tracked as "refundable only"). Re-verify the cheapest
+// candidate actually satisfies every preference the search asked for -
+// mirrors filterByPreferences' own per-field checks exactly.
+function satisfiesTrackedPreferences(offer: NormalizedOffer, params: SearchParams): boolean {
+  if (params.prefer_refundable && !offer.conditions.refundable) return false;
+  if (params.prefer_changeable && !offer.conditions.changeable) return false;
+  if (params.depart_after || params.depart_before) {
+    const dep = offer.slices[0]?.segments[0]?.departing_at;
+    if (dep) {
+      const time = dep.slice(11, 16);
+      if (params.depart_after && time < params.depart_after) return false;
+      if (params.depart_before && time > params.depart_before) return false;
+    }
+  }
+  return true;
+}
+
 export interface TrackedSearchWithUser extends TrackedSearchRow {
   user: {
     email: string;
@@ -100,7 +124,10 @@ export async function checkTrackedSearchForPriceDrop(
   const { offers: filtered } = filterByPreferences(offers, params);
   const cheapest = rankOffers(filtered)[0];
 
-  if (!cheapest) {
+  // No offers at all, or filterByPreferences fell back to the unfiltered
+  // list because nothing currently satisfies the tracked preference(s) -
+  // either way there's no valid fare to compare against right now.
+  if (!cheapest || !satisfiesTrackedPreferences(cheapest, params)) {
     return { trackedSearchId: tracked.id, checked: false, dropped: false };
   }
 

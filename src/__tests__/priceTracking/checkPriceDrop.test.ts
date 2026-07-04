@@ -235,4 +235,26 @@ describe("checkTrackedSearchForPriceDrop", () => {
     // "refundable only" would have excluded from the original tracked search.
     expect(outcome.newAmount).toBe("280.00");
   });
+
+  it("does not alert when no fare currently satisfies the tracked preference (filterByPreferences' own fallback)", async () => {
+    // Zero refundable offers - filterByPreferences falls back to the full,
+    // unfiltered list (its correct behavior for the interactive chat UI).
+    mockCreateOfferRequest.mockResolvedValueOnce([
+      makeOffer("cheap_nonref", "100.00", "GBP", false),
+    ]);
+
+    const tracked = makeTracked({
+      preferRefundable: true,
+      lastKnownPrice: "300.00",
+      lastKnownCurrency: "GBP",
+    });
+    const outcome = await checkTrackedSearchForPriceDrop(tracked);
+
+    // Must NOT report this £100 non-refundable fare as a "drop" for a
+    // refundable-only tracked search, and must NOT touch the stored baseline.
+    expect(outcome.checked).toBe(false);
+    expect(outcome.dropped).toBe(false);
+    expect(mockSendPriceDropAlert).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
 });
