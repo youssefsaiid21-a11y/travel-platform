@@ -171,6 +171,7 @@ Use answer_travel_question when the user asks a general travel question (visas, 
 Flight search rules:
 - Always convert city/country names to the primary IATA airport code (London→LHR, New York→JFK, Paris→CDG, Tokyo→NRT, Sydney→SYD, Dubai→DXB, Bangkok→BKK, Los Angeles→LAX, Chicago→ORD, Amsterdam→AMS, Toronto→YYZ, Singapore→SIN, Berlin→BER, Lisbon→LIS, Barcelona→BCN).
 - For vague dates ("next Friday", "sometime in October"), pick the nearest upcoming occurrence and record it in flexible_date_note.
+- For a specific month/day given with no year ("March 10", "June 20th"), assume the nearest future occurrence: if that month/day has already passed this year, use next year instead of this year.
 - Default to 1 adult passenger if not specified.
 - On follow-up messages, carry forward ALL parameters from the previous search that the user did not explicitly change.
 - If the user says "add return" or "make it a return", add return_date approximately 7 days after departure.
