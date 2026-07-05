@@ -7,11 +7,12 @@ const mockDuffelRequest = vi.hoisted(() => vi.fn());
 const mockGetOfferWithServices = vi.hoisted(() => vi.fn());
 const mockPaymentIntentsRetrieve = vi.hoisted(() => vi.fn());
 const mockBookingCreate = vi.hoisted(() => vi.fn());
+const mockBookingFindFirst = vi.hoisted(() => vi.fn());
 
 vi.mock("@/auth", () => ({ auth: mockAuth }));
 
 vi.mock("@/lib/db", () => ({
-  db: { booking: { create: mockBookingCreate } },
+  db: { booking: { create: mockBookingCreate, findFirst: mockBookingFindFirst } },
 }));
 
 vi.mock("@/lib/duffel/client", async () => {
@@ -107,6 +108,8 @@ beforeEach(() => {
     id: "bkng_new_001",
     ...data,
   }));
+  mockBookingFindFirst.mockReset();
+  mockBookingFindFirst.mockResolvedValue(null);
 });
 
 describe("POST /api/booking", () => {
@@ -146,7 +149,7 @@ describe("POST /api/booking", () => {
     expect(mockGetOfferWithServices).not.toHaveBeenCalled();
   });
 
-  it("returns 410 when the offer is no longer available on Duffel", async () => {
+  it("returns 410 when the offer is no longer available on Duffel, but still records the charge for audit/refund", async () => {
     mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
     mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
     mockGetOfferWithServices.mockRejectedValueOnce(
@@ -161,17 +164,34 @@ describe("POST /api/booking", () => {
     const res = await POST(makeRequest(baseBody()));
     expect(res.status).toBe(410);
     expect(mockDuffelRequest).not.toHaveBeenCalled();
+    // Stripe already charged the card by this point - refusing the booking
+    // must not also lose the paper trail for a manual refund.
+    expect(mockBookingCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: USER_ID,
+          status: "payment_unfulfilled",
+          stripePaymentIntentId: PI_ID,
+          duffelOrderId: null,
+        }),
+      })
+    );
   });
 
-  it("returns 502 when the offer cannot otherwise be verified", async () => {
+  it("returns 502 when the offer cannot otherwise be verified, but still records the charge", async () => {
     mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
     mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
     mockGetOfferWithServices.mockRejectedValueOnce(new Error("network down"));
     const res = await POST(makeRequest(baseBody()));
     expect(res.status).toBe(502);
+    expect(mockBookingCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "payment_unfulfilled" }),
+      })
+    );
   });
 
-  it("rejects the booking when the charged amount does not match the offer's real price (tamper protection)", async () => {
+  it("rejects the booking when the charged amount does not match the offer's real price (tamper protection), but still records the charge", async () => {
     mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
     // Attacker charged only $0.01 but presents a genuine, expensive offerId.
     mockPaymentIntentsRetrieve.mockResolvedValueOnce(
@@ -187,7 +207,15 @@ describe("POST /api/booking", () => {
     const body = await res.json();
     expect(body.error).toMatch(/does not match/i);
     expect(mockDuffelRequest).not.toHaveBeenCalled();
-    expect(mockBookingCreate).not.toHaveBeenCalled();
+    expect(mockBookingCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "payment_unfulfilled",
+          totalAmount: "342.50",
+          totalCurrency: "GBP",
+        }),
+      })
+    );
   });
 
   it("rejects the booking when the charged currency does not match the offer's currency", async () => {
@@ -202,6 +230,21 @@ describe("POST /api/booking", () => {
     const res = await POST(makeRequest(baseBody()));
     expect(res.status).toBe(400);
     expect(mockDuffelRequest).not.toHaveBeenCalled();
+  });
+
+  it("returns the existing booking instead of creating a duplicate when the payment intent was already processed", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
+    mockBookingFindFirst.mockResolvedValueOnce({ id: "bkng_existing_001", status: "confirmed" });
+
+    const res = await POST(makeRequest(baseBody()));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.booking.id).toBe("bkng_existing_001");
+    expect(mockGetOfferWithServices).not.toHaveBeenCalled();
+    expect(mockDuffelRequest).not.toHaveBeenCalled();
+    expect(mockBookingCreate).not.toHaveBeenCalled();
   });
 
   it("creates the order and a confirmed booking when the amount matches", async () => {

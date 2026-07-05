@@ -60,6 +60,13 @@ export default auth((req) => {
 
 export const config = {
   // Broad on purpose - CSP needs to apply to every HTML-rendering route, not
-  // just the auth-protected ones the redirect logic above cares about.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // just the auth-protected ones the redirect logic above cares about. API
+  // routes are excluded: they return JSON (no inline scripts to nonce, no
+  // CSP to enforce) and already run their own `auth()` check in-handler, so
+  // routing them through this wrapper too would just be wasted session-cookie
+  // decoding on every request - including unauthenticated ones like the
+  // Stripe webhook and the cron endpoint, where it's also pure risk for no
+  // benefit (an exception in auth() would fire before those routes ever get
+  // to their own signature/token checks).
+  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico).*)"],
 };

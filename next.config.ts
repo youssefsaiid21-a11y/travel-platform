@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-// Content-Security-Policy is set in middleware.ts instead of here - it needs
+// Content-Security-Policy is set in src/proxy.ts instead of here - it needs
 // a fresh per-request nonce for Next.js's own inline hydration scripts,
 // which a static header from next.config.ts's headers() can't provide.
 const securityHeaders = [

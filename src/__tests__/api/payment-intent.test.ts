@@ -145,6 +145,17 @@ describe("POST /api/stripe/payment-intent", () => {
     expect(body.error).toMatch(/Stripe network error/);
   });
 
+  it("returns 502 when the offer lookup fails for a non-Duffel-error reason", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: "usr_1" } });
+    mockGetOfferWithServices.mockRejectedValueOnce(new Error("network timeout"));
+
+    const res = await POST(makeRequest({ offerId: "off_abc123" }));
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toMatch(/Could not verify the offer price/);
+    expect(mockPaymentIntentsCreate).not.toHaveBeenCalled();
+  });
+
   it("lowercases the currency when calling Stripe", async () => {
     mockAuth.mockResolvedValueOnce({ user: { id: "usr_1" } });
     mockGetOfferWithServices.mockResolvedValueOnce(makeOffer({ total_currency: "EUR" }));
