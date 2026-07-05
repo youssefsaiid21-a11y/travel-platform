@@ -127,19 +127,26 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
   const [statusStep, setStatusStep] = useState("");
-  const [sessionId, setSessionId] = useState<string | undefined>(() => {
-    if (typeof window === "undefined") return undefined;
-    return sessionStorage.getItem("orbi_session_id") ?? undefined;
-  });
-  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
+  // Both of these read browser storage, so they must start at the same
+  // value the server rendered (undefined/[]) and only pick up the real
+  // value in an effect after mount - reading storage inside the useState
+  // initializer runs during hydration itself and made the client's first
+  // render disagree with the server's, which crashed hydration (React
+  // error #418) for any returning visitor with non-empty storage.
+  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem("orbi_session_id");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loading persisted state after mount, not syncing from a prop/render value
+      if (stored) setSessionId(stored);
+    } catch { /* ignore */ }
     try {
       const stored = localStorage.getItem("recent_searches");
-      return stored ? (JSON.parse(stored) as string[]) : [];
-    } catch {
-      return [];
-    }
-  });
+      if (stored) setRecentSearches(JSON.parse(stored) as string[]);
+    } catch { /* ignore */ }
+  }, []); // intentionally runs once on mount only, after hydration completes
   // Tracks which assistant message indexes have had "Track this price"
   // clicked (server-persisted via /api/tracked-searches - this Set is just
   // local UI state so the button can flip to a confirmed state).
