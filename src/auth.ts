@@ -4,6 +4,13 @@ import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Explicit rather than relying on NextAuth's platform auto-detection
+  // (which only auto-trusts the host on Vercel) - this app is meant to be
+  // portable across hosting providers, not pinned to a single one. Safe
+  // here specifically because there's no OAuth provider (only Credentials),
+  // so the usual trustHost risk (forged Host header hijacking an OAuth
+  // redirect) doesn't apply.
+  trustHost: true,
   providers: [
     Credentials({
       credentials: {
