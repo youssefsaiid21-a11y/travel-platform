@@ -7,23 +7,24 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 // fires a notification (via sendPriceDropAlert) for any that got cheaper.
 //
 // There's no cron scheduler built into Next.js - in a real deployment this
-// route would be invoked on a schedule rather than by a person:
-//   - Vercel Cron (vercel.json `crons` entry hitting this path on a schedule)
-//     - Vercel signs cron requests with a bearer token in the Authorization
-//       header (CRON_SECRET) that this route should verify.
+// route is invoked on a schedule rather than by a person:
+//   - Vercel Cron (see vercel.json `crons` entry hitting this path) - Vercel
+//     signs cron requests with a bearer token in the Authorization header
+//     matching CRON_SECRET.
 //   - or a GitHub Actions workflow on a `schedule:` trigger that curls this
-//     URL with a shared secret header.
-// For now this is intentionally unauthenticated so it can be triggered
-// manually during development - do NOT deploy it this way. Before going
-// live, add a check like:
-//   if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`)
-//     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+//     URL with the same shared secret header.
 export async function POST(req: NextRequest) {
-  // Defense-in-depth alongside the CRON_SECRET check this route needs before
-  // deployment (see above) - even in dev, this is the most expensive
-  // operation in the app (one Duffel search per tracked row, unbounded
-  // concurrency), so it shouldn't be exempt from the rate-limiting every
-  // other route here has.
+  if (process.env.NODE_ENV !== "test") {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret || req.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
+  // Defense-in-depth alongside the CRON_SECRET check above - even in dev,
+  // this is the most expensive operation in the app (one Duffel search per
+  // tracked row, unbounded concurrency), so it shouldn't be exempt from the
+  // rate-limiting every other route here has.
   const rateLimited = enforceRateLimit(req, "cron-check-price-drops");
   if (rateLimited) return rateLimited;
 

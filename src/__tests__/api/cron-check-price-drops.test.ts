@@ -1,8 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
-function makeRequest() {
-  return new NextRequest("http://localhost/api/cron/check-price-drops", { method: "POST" });
+const CRON_SECRET = "test_cron_secret";
+
+function makeRequest(authHeader?: string) {
+  return new NextRequest("http://localhost/api/cron/check-price-drops", {
+    method: "POST",
+    ...(authHeader ? { headers: { authorization: authHeader } } : {}),
+  });
 }
 
 const mockFindMany = vi.hoisted(() => vi.fn());
@@ -19,6 +24,9 @@ vi.mock("@/lib/priceTracking/checkPriceDrop", () => ({
 }));
 
 import { POST } from "@/app/api/cron/check-price-drops/route";
+
+const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+const ORIGINAL_CRON_SECRET = process.env.CRON_SECRET;
 
 beforeEach(() => {
   mockFindMany.mockReset();
@@ -61,5 +69,42 @@ describe("POST /api/cron/check-price-drops", () => {
 
     expect(res.status).toBe(200);
     expect(body).toEqual({ total: 2, checked: 1, dropped: 1, failed: 1 });
+  });
+});
+
+describe("POST /api/cron/check-price-drops auth (outside test NODE_ENV)", () => {
+  beforeEach(() => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("CRON_SECRET", CRON_SECRET);
+  });
+
+  afterEach(() => {
+    vi.stubEnv("NODE_ENV", ORIGINAL_NODE_ENV ?? "test");
+    vi.stubEnv("CRON_SECRET", ORIGINAL_CRON_SECRET ?? "");
+  });
+
+  it("rejects requests with no Authorization header", async () => {
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(401);
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects requests with the wrong bearer token", async () => {
+    const res = await POST(makeRequest("Bearer wrong_secret"));
+    expect(res.status).toBe(401);
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects requests when CRON_SECRET is not configured on the server", async () => {
+    vi.stubEnv("CRON_SECRET", "");
+    const res = await POST(makeRequest(`Bearer ${CRON_SECRET}`));
+    expect(res.status).toBe(401);
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  it("allows requests with the correct bearer token", async () => {
+    mockFindMany.mockResolvedValueOnce([]);
+    const res = await POST(makeRequest(`Bearer ${CRON_SECRET}`));
+    expect(res.status).toBe(200);
   });
 });
