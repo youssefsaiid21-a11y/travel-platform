@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import type { NormalizedOffer } from "@/lib/duffel/types";
 
 const mockAuth = vi.hoisted(() => vi.fn());
@@ -7,12 +8,19 @@ const mockDuffelRequest = vi.hoisted(() => vi.fn());
 const mockGetOfferWithServices = vi.hoisted(() => vi.fn());
 const mockPaymentIntentsRetrieve = vi.hoisted(() => vi.fn());
 const mockBookingCreate = vi.hoisted(() => vi.fn());
+const mockBookingUpdate = vi.hoisted(() => vi.fn());
 const mockBookingFindFirst = vi.hoisted(() => vi.fn());
 
 vi.mock("@/auth", () => ({ auth: mockAuth }));
 
 vi.mock("@/lib/db", () => ({
-  db: { booking: { create: mockBookingCreate, findFirst: mockBookingFindFirst } },
+  db: {
+    booking: {
+      create: mockBookingCreate,
+      update: mockBookingUpdate,
+      findFirst: mockBookingFindFirst,
+    },
+  },
 }));
 
 vi.mock("@/lib/duffel/client", async () => {
@@ -41,6 +49,14 @@ import { DuffelError } from "@/lib/duffel/client";
 const USER_ID = "usr_owner_001";
 const OFFER_ID = "off_abc123";
 const PI_ID = "pi_test_001";
+const PENDING_BOOKING_ID = "bkng_pending_001";
+
+function uniqueConstraintError() {
+  return new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+    code: "P2002",
+    clientVersion: "6.19.3",
+  });
+}
 
 function makeOffer(overrides: Partial<NormalizedOffer> = {}): NormalizedOffer {
   return {
@@ -104,12 +120,19 @@ beforeEach(() => {
   mockGetOfferWithServices.mockReset();
   mockPaymentIntentsRetrieve.mockReset();
   mockBookingCreate.mockReset();
+  mockBookingUpdate.mockReset();
+  mockBookingFindFirst.mockReset();
+  // Default: claiming the PaymentIntent succeeds (no concurrent request has
+  // already claimed it), producing a fresh "pending" row.
   mockBookingCreate.mockImplementation(async ({ data }: { data: object }) => ({
-    id: "bkng_new_001",
+    id: PENDING_BOOKING_ID,
+    status: "pending",
     ...data,
   }));
-  mockBookingFindFirst.mockReset();
-  mockBookingFindFirst.mockResolvedValue(null);
+  mockBookingUpdate.mockImplementation(async ({ data }: { data: object }) => ({
+    id: PENDING_BOOKING_ID,
+    ...data,
+  }));
 });
 
 describe("POST /api/booking", () => {
@@ -166,14 +189,10 @@ describe("POST /api/booking", () => {
     expect(mockDuffelRequest).not.toHaveBeenCalled();
     // Stripe already charged the card by this point - refusing the booking
     // must not also lose the paper trail for a manual refund.
-    expect(mockBookingCreate).toHaveBeenCalledWith(
+    expect(mockBookingUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          userId: USER_ID,
-          status: "payment_unfulfilled",
-          stripePaymentIntentId: PI_ID,
-          duffelOrderId: null,
-        }),
+        where: { id: PENDING_BOOKING_ID },
+        data: expect.objectContaining({ status: "failed" }),
       })
     );
   });
@@ -184,9 +203,9 @@ describe("POST /api/booking", () => {
     mockGetOfferWithServices.mockRejectedValueOnce(new Error("network down"));
     const res = await POST(makeRequest(baseBody()));
     expect(res.status).toBe(502);
-    expect(mockBookingCreate).toHaveBeenCalledWith(
+    expect(mockBookingUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: "payment_unfulfilled" }),
+        data: expect.objectContaining({ status: "failed" }),
       })
     );
   });
@@ -207,10 +226,10 @@ describe("POST /api/booking", () => {
     const body = await res.json();
     expect(body.error).toMatch(/does not match/i);
     expect(mockDuffelRequest).not.toHaveBeenCalled();
-    expect(mockBookingCreate).toHaveBeenCalledWith(
+    expect(mockBookingUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          status: "payment_unfulfilled",
+          status: "failed",
           totalAmount: "342.50",
           totalCurrency: "GBP",
         }),
@@ -232,22 +251,7 @@ describe("POST /api/booking", () => {
     expect(mockDuffelRequest).not.toHaveBeenCalled();
   });
 
-  it("returns the existing booking instead of creating a duplicate when the payment intent was already processed", async () => {
-    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
-    mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
-    mockBookingFindFirst.mockResolvedValueOnce({ id: "bkng_existing_001", status: "confirmed" });
-
-    const res = await POST(makeRequest(baseBody()));
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.booking.id).toBe("bkng_existing_001");
-    expect(mockGetOfferWithServices).not.toHaveBeenCalled();
-    expect(mockDuffelRequest).not.toHaveBeenCalled();
-    expect(mockBookingCreate).not.toHaveBeenCalled();
-  });
-
-  it("creates the order and a confirmed booking when the amount matches", async () => {
+  it("claims the payment intent with a pending row, then updates it to confirmed when the amount matches", async () => {
     mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
     mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
     mockGetOfferWithServices.mockResolvedValueOnce(makeOffer());
@@ -261,8 +265,13 @@ describe("POST /api/booking", () => {
     expect(body.booking.status).toBe("confirmed");
     expect(mockBookingCreate).toHaveBeenCalledWith(
       expect.objectContaining({
+        data: expect.objectContaining({ userId: USER_ID, status: "pending", stripePaymentIntentId: PI_ID }),
+      })
+    );
+    expect(mockBookingUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: PENDING_BOOKING_ID },
         data: expect.objectContaining({
-          userId: USER_ID,
           totalAmount: "342.50",
           totalCurrency: "GBP",
           duffelOrderId: "ord_001",
@@ -307,6 +316,47 @@ describe("POST /api/booking", () => {
     const body = await res.json();
     expect(body.booking.status).toBe("failed");
     expect(body.booking.duffelOrderId).toBeNull();
+  });
+
+  it("returns the existing confirmed booking instead of creating a duplicate when the payment intent was already fully processed (idempotency)", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
+    // Simulates a concurrent/earlier request having already claimed and
+    // completed this exact PaymentIntent - the DB's unique constraint
+    // rejects this request's own claim attempt.
+    mockBookingCreate.mockRejectedValueOnce(uniqueConstraintError());
+    mockBookingFindFirst.mockResolvedValueOnce({ id: "bkng_existing_001", status: "confirmed" });
+
+    const res = await POST(makeRequest(baseBody()));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.booking.id).toBe("bkng_existing_001");
+    expect(mockBookingFindFirst).toHaveBeenCalledWith({
+      where: { stripePaymentIntentId: PI_ID, userId: USER_ID },
+    });
+    expect(mockGetOfferWithServices).not.toHaveBeenCalled();
+    expect(mockDuffelRequest).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 (not 200) when the existing booking for this payment intent never completed", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
+    mockBookingCreate.mockRejectedValueOnce(uniqueConstraintError());
+    mockBookingFindFirst.mockResolvedValueOnce({ id: "bkng_existing_001", status: "failed" });
+
+    const res = await POST(makeRequest(baseBody()));
+
+    expect(res.status).toBe(409);
+    expect(mockGetOfferWithServices).not.toHaveBeenCalled();
+  });
+
+  it("propagates an unexpected error from the claim step instead of swallowing it as a duplicate", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
+    mockBookingCreate.mockRejectedValueOnce(new Error("connection reset"));
+
+    await expect(POST(makeRequest(baseBody()))).rejects.toThrow("connection reset");
   });
 });
 

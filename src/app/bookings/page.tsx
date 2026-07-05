@@ -86,7 +86,40 @@ export default async function BookingsPage() {
         ) : (
           <ul className={styles.list}>
             {bookings.map((b) => {
-              const offer = JSON.parse(b.offerSnapshot) as NormalizedOffer;
+              // A booking whose payment succeeded but whose offer could
+              // never be verified (see POST /api/booking) has a minimal
+              // { offerId, reason } snapshot instead of a full offer - one
+              // such row must not crash the whole list.
+              const raw = JSON.parse(b.offerSnapshot) as unknown;
+              const offer =
+                raw &&
+                typeof raw === "object" &&
+                Array.isArray((raw as NormalizedOffer).slices) &&
+                (raw as NormalizedOffer).slices.length > 0
+                  ? (raw as NormalizedOffer)
+                  : null;
+
+              if (!offer) {
+                return (
+                  <li key={b.id} className={styles.item}>
+                    <Link href={`/booking/${b.id}`} className={styles.itemLink}>
+                      <div className={styles.itemTop}>
+                        <span className={styles.route}>Flight details unavailable</span>
+                        <span className={styles.status} data-status={b.status}>
+                          {b.status}
+                        </span>
+                      </div>
+                      <div className={styles.itemMeta}>
+                        <span>{fmtAmount(b.totalAmount, b.totalCurrency)}</span>
+                      </div>
+                      <div className={styles.bookedOn}>
+                        Booked {formatDate(b.createdAt)}
+                      </div>
+                    </Link>
+                  </li>
+                );
+              }
+
               const firstSeg = offer.slices[0].segments[0];
               const lastSlice = offer.slices[offer.slices.length - 1];
               const finalSeg = lastSlice.segments[lastSlice.segments.length - 1];

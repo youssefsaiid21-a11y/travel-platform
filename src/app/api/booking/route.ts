@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { duffelRequest, DuffelError } from "@/lib/duffel/client";
@@ -6,6 +7,10 @@ import { getOfferWithServices } from "@/lib/duffel/search";
 import type { SearchParams } from "@/lib/parser/types";
 import { getStripe } from "@/lib/stripe";
 import { checkRateLimit } from "@/lib/rate-limit";
+
+function isUniqueConstraintError(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
+}
 
 export interface BookingPassenger {
   id: string;
@@ -65,17 +70,57 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // A retried/replayed request for a payment intent that already produced a
-  // booking (successful or not) must not attempt a second Duffel order from
-  // a single charge - return the existing record instead of re-processing.
-  const existingBooking = await db.booking.findFirst({ where: { stripePaymentIntentId } });
-  if (existingBooking) {
-    return NextResponse.json({ booking: existingBooking }, { status: 200 });
-  }
-
   const passengerNames = JSON.stringify(
     passengers.map((p) => `${p.given_name} ${p.family_name}`)
   );
+
+  // Claim this PaymentIntent with a "pending" row BEFORE doing anything
+  // expensive (verifying the offer, calling Duffel). stripePaymentIntentId
+  // is DB-unique, so if two requests for the same succeeded payment race
+  // each other, only one create() below can win - the loser gets a unique-
+  // constraint error here and never reaches the Duffel order call at all.
+  // Verifying-then-writing-once (the previous approach) only stopped a
+  // second *row*, not a second real Duffel order, since both requests would
+  // already be past the point of calling Duffel by the time either wrote to
+  // the database.
+  let booking;
+  try {
+    booking = await db.booking.create({
+      data: {
+        userId: session.user.id,
+        duffelOrderId: null,
+        duffelBookingRef: null,
+        status: "pending",
+        totalAmount: (pi.amount / 100).toFixed(2),
+        totalCurrency: pi.currency.toUpperCase(),
+        offerSnapshot: JSON.stringify({ offerId }),
+        searchParams: JSON.stringify(searchParams),
+        passengerNames,
+        stripePaymentIntentId,
+        ...(specialRequests ? { specialRequests } : {}),
+      },
+    });
+  } catch (err) {
+    if (!isUniqueConstraintError(err)) throw err;
+    const existingBooking = await db.booking.findFirst({
+      where: { stripePaymentIntentId, userId: session.user.id },
+    });
+    // Only a genuinely completed booking is safe to report as success on
+    // retry - a prior "failed"/"pending" row (offer gone, amount mismatch,
+    // concurrent request still in flight) must keep surfacing as an error,
+    // or a client retrying after a transient failure clears would be told
+    // it succeeded when no order was ever placed.
+    if (existingBooking?.status === "confirmed") {
+      return NextResponse.json({ booking: existingBooking }, { status: 200 });
+    }
+    return NextResponse.json(
+      {
+        error: "This payment did not result in a completed booking. Contact support.",
+        booking: existingBooking,
+      },
+      { status: 409 }
+    );
+  }
 
   // Re-fetch the offer from Duffel rather than trusting a client-supplied
   // one, and confirm the amount actually charged matches its real price -
@@ -87,24 +132,17 @@ export async function POST(req: NextRequest) {
     offer = await getOfferWithServices(offerId);
   } catch (err) {
     // Stripe has already charged the card at this point - even though the
-    // booking can't proceed, this must leave an audit row (not just an error
-    // response) so a charged-but-unbooked customer can be found and refunded.
-    const failedBooking = await db.booking.create({
+    // booking can't proceed, the claimed row above must be updated to
+    // reflect that (not left "pending" forever) so support can find and
+    // refund a charged-but-unbooked customer.
+    const failedBooking = await db.booking.update({
+      where: { id: booking.id },
       data: {
-        userId: session.user.id,
-        duffelOrderId: null,
-        duffelBookingRef: null,
-        status: "payment_unfulfilled",
-        totalAmount: (pi.amount / 100).toFixed(2),
-        totalCurrency: pi.currency.toUpperCase(),
+        status: "failed",
         offerSnapshot: JSON.stringify({
           offerId,
           reason: err instanceof DuffelError ? "offer_unavailable" : "offer_verification_failed",
         }),
-        searchParams: JSON.stringify(searchParams),
-        passengerNames,
-        stripePaymentIntentId,
-        ...(specialRequests ? { specialRequests } : {}),
       },
     });
     if (err instanceof DuffelError) {
@@ -124,21 +162,13 @@ export async function POST(req: NextRequest) {
     pi.amount !== expectedCents ||
     pi.currency !== offer.total_currency.toLowerCase()
   ) {
-    // Same reasoning as above - the charge already happened, so this needs
-    // an audit row even though the booking is refused.
-    const failedBooking = await db.booking.create({
+    const failedBooking = await db.booking.update({
+      where: { id: booking.id },
       data: {
-        userId: session.user.id,
-        duffelOrderId: null,
-        duffelBookingRef: null,
-        status: "payment_unfulfilled",
+        status: "failed",
         totalAmount: offer.total_amount,
         totalCurrency: offer.total_currency,
         offerSnapshot: JSON.stringify(offer),
-        searchParams: JSON.stringify(searchParams),
-        passengerNames,
-        stripePaymentIntentId,
-        ...(specialRequests ? { specialRequests } : {}),
       },
     });
     return NextResponse.json(
@@ -188,21 +218,17 @@ export async function POST(req: NextRequest) {
     console.error("Duffel order creation failed:", err);
   }
 
-  const booking = await db.booking.create({
+  const finalBooking = await db.booking.update({
+    where: { id: booking.id },
     data: {
-      userId: session.user.id,
       duffelOrderId,
       duffelBookingRef,
       status,
       totalAmount: offer.total_amount,
       totalCurrency: offer.total_currency,
       offerSnapshot: JSON.stringify(offer),
-      searchParams: JSON.stringify(searchParams),
-      passengerNames,
-      stripePaymentIntentId,
-      ...(specialRequests ? { specialRequests } : {}),
     },
   });
 
-  return NextResponse.json({ booking }, { status: 201 });
+  return NextResponse.json({ booking: finalBooking }, { status: 201 });
 }

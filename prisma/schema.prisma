@@ -60,7 +60,12 @@ model Booking {
   user                  User     @relation(fields: [userId], references: [id])
 
   @@index([userId, createdAt])
-  @@index([stripePaymentIntentId])
+  // Unique, not just indexed: the idempotency check in POST /api/booking is
+  // check-then-act (findFirst, then create) and not itself atomic, so this
+  // is what actually stops two concurrent requests for the same successful
+  // payment from both slipping past that check and creating two Duffel
+  // orders from a single charge.
+  @@unique([stripePaymentIntentId])
 }
 
 // A saved search a user wants to be notified about if the price drops.

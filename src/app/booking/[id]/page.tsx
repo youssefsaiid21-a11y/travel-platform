@@ -71,7 +71,18 @@ export default async function BookingDetailPage({
 
   if (!booking || booking.userId !== session.user.id) notFound();
 
-  const offer = JSON.parse(booking.offerSnapshot) as NormalizedOffer;
+  // A booking whose payment succeeded but whose offer could never be
+  // verified (see POST /api/booking) has no real offer to snapshot - its
+  // offerSnapshot is a minimal { offerId, reason } record instead of a full
+  // NormalizedOffer, so this must not assume `.slices` exists.
+  const offerSnapshotRaw = JSON.parse(booking.offerSnapshot) as unknown;
+  const offer =
+    offerSnapshotRaw &&
+    typeof offerSnapshotRaw === "object" &&
+    Array.isArray((offerSnapshotRaw as NormalizedOffer).slices) &&
+    (offerSnapshotRaw as NormalizedOffer).slices.length > 0
+      ? (offerSnapshotRaw as NormalizedOffer)
+      : null;
   const passengerNames = JSON.parse(booking.passengerNames) as string[];
 
   // Post-booking flight status: re-fetch the order from Duffel and diff its
@@ -81,7 +92,7 @@ export default async function BookingDetailPage({
   // renders even if Duffel is unreachable.
   let scheduleCheck: ScheduleChangeResult | null = null;
   let scheduleCheckFailed = false;
-  if (booking.status === "confirmed" && booking.duffelOrderId) {
+  if (booking.status === "confirmed" && booking.duffelOrderId && offer) {
     try {
       const order = await getOrderStatus(booking.duffelOrderId);
       scheduleCheck = checkForScheduleChanges(offer, order);
@@ -133,53 +144,62 @@ export default async function BookingDetailPage({
           </div>
         </div>
 
-        {offer.slices.map((slice, si) => {
-          const firstSeg = slice.segments[0];
-          const lastSeg = slice.segments[slice.segments.length - 1];
-          return (
-            <div key={si} className={styles.card}>
-              <div className={styles.flightMeta}>
-                <span className={styles.airline}>
-                  {offer.slices.length > 1
-                    ? si === 0 ? `${offer.owner.name} · Outbound` : `${offer.owner.name} · Return`
-                    : offer.owner.name}
-                </span>
-                <span className={styles.flightNum}>
-                  {firstSeg.marketing_carrier.iata_code}{firstSeg.flight_number}
-                </span>
-              </div>
-              <div className={styles.flightRoute}>
-                <div className={styles.flightEndpoint}>
-                  <span className={styles.flightTime}>{fmtTime(firstSeg.departing_at)}</span>
-                  <span className={styles.flightIata}>{firstSeg.origin.iata_code}</span>
-                  <span className={styles.flightCity}>{firstSeg.origin.name.split(" ").slice(0, 2).join(" ")}</span>
-                </div>
-                <div className={styles.flightMiddle}>
-                  <span className={styles.flightDur}>{fmtDuration(slice.duration)}</span>
-                  <div className={styles.flightLine} />
-                  <span className={styles.flightStops}>
-                    {slice.stops === 0 ? "Non-stop" : `${slice.stops} stop${slice.stops > 1 ? "s" : ""}`}
+        {offer ? (
+          offer.slices.map((slice, si) => {
+            const firstSeg = slice.segments[0];
+            const lastSeg = slice.segments[slice.segments.length - 1];
+            return (
+              <div key={si} className={styles.card}>
+                <div className={styles.flightMeta}>
+                  <span className={styles.airline}>
+                    {offer.slices.length > 1
+                      ? si === 0 ? `${offer.owner.name} · Outbound` : `${offer.owner.name} · Return`
+                      : offer.owner.name}
+                  </span>
+                  <span className={styles.flightNum}>
+                    {firstSeg.marketing_carrier.iata_code}{firstSeg.flight_number}
                   </span>
                 </div>
-                <div className={`${styles.flightEndpoint} ${styles.flightEndpointRight}`}>
-                  <span className={styles.flightTime}>{fmtTime(lastSeg.arriving_at)}</span>
-                  <span className={styles.flightIata}>{lastSeg.destination.iata_code}</span>
-                  <span className={styles.flightCity}>{lastSeg.destination.name.split(" ").slice(0, 2).join(" ")}</span>
+                <div className={styles.flightRoute}>
+                  <div className={styles.flightEndpoint}>
+                    <span className={styles.flightTime}>{fmtTime(firstSeg.departing_at)}</span>
+                    <span className={styles.flightIata}>{firstSeg.origin.iata_code}</span>
+                    <span className={styles.flightCity}>{firstSeg.origin.name.split(" ").slice(0, 2).join(" ")}</span>
+                  </div>
+                  <div className={styles.flightMiddle}>
+                    <span className={styles.flightDur}>{fmtDuration(slice.duration)}</span>
+                    <div className={styles.flightLine} />
+                    <span className={styles.flightStops}>
+                      {slice.stops === 0 ? "Non-stop" : `${slice.stops} stop${slice.stops > 1 ? "s" : ""}`}
+                    </span>
+                  </div>
+                  <div className={`${styles.flightEndpoint} ${styles.flightEndpointRight}`}>
+                    <span className={styles.flightTime}>{fmtTime(lastSeg.arriving_at)}</span>
+                    <span className={styles.flightIata}>{lastSeg.destination.iata_code}</span>
+                    <span className={styles.flightCity}>{lastSeg.destination.name.split(" ").slice(0, 2).join(" ")}</span>
+                  </div>
+                </div>
+                <div className={styles.flightDateRow}>
+                  {formatDateTime(firstSeg.departing_at)}
                 </div>
               </div>
-              <div className={styles.flightDateRow}>
-                {formatDateTime(firstSeg.departing_at)}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        ) : (
+          <div className={styles.card}>
+            <p className={styles.statusUnavailable}>
+              Flight details aren&apos;t available for this booking - contact
+              support with the booking ID above if you were charged.
+            </p>
+          </div>
+        )}
 
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Passengers</h2>
           {passengerNames.map((name, i) => (
             <p key={i} className={styles.passenger}>
               {name}
-              {offer.passengers[i]?.type && (
+              {offer?.passengers[i]?.type && (
                 <span className={styles.passengerType}>
                   {" "}· {offer.passengers[i].type.charAt(0).toUpperCase() + offer.passengers[i].type.slice(1)}
                 </span>
@@ -251,7 +271,7 @@ export default async function BookingDetailPage({
           </div>
         )}
 
-        {booking.status === "confirmed" && (() => {
+        {booking.status === "confirmed" && offer && (() => {
           const outboundFirst = offer.slices[0].segments[0];
           const outboundLast = offer.slices[0].segments[offer.slices[0].segments.length - 1];
           const returnLast = offer.slices.length > 1
