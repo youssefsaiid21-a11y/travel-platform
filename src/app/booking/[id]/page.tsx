@@ -16,10 +16,19 @@ export async function generateMetadata({
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
-  const { id } = await params;
-  const booking = await db.booking.findUnique({ where: { id }, select: { offerSnapshot: true, duffelBookingRef: true } });
   const noindex = { robots: { index: false } };
-  if (!booking) return { title: "Booking · Orbi", ...noindex };
+  const session = await auth();
+  if (!session?.user?.id) return { title: "Booking · Orbi", ...noindex };
+
+  const { id } = await params;
+  const booking = await db.booking.findUnique({
+    where: { id },
+    select: { offerSnapshot: true, duffelBookingRef: true, userId: true },
+  });
+  // Route/PNR are only safe to embed in the page title (and thus link
+  // previews) for the booking's owner - anyone else who knows/guesses the
+  // booking id should see the same generic title as a 404.
+  if (!booking || booking.userId !== session.user.id) return { title: "Booking · Orbi", ...noindex };
   try {
     const offer = JSON.parse(booking.offerSnapshot) as NormalizedOffer;
     const seg0 = offer.slices[0].segments[0];

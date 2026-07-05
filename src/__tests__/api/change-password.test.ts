@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const mockAuth = vi.hoisted(() => vi.fn());
@@ -117,5 +117,32 @@ describe("POST /api/auth/change-password", () => {
 
     await POST(makeRequest({ currentPassword: "oldPass123", newPassword: "newPass456" }));
     expect(mockBcryptHash).toHaveBeenCalledWith("newPass456", 12);
+  });
+});
+
+describe("POST /api/auth/change-password rate limiting (outside test NODE_ENV)", () => {
+  const RATE_LIMITED_USER = "usr_rate_limit_target";
+
+  beforeEach(() => {
+    vi.stubEnv("NODE_ENV", "production");
+  });
+
+  afterEach(() => {
+    vi.stubEnv("NODE_ENV", "test");
+  });
+
+  it("returns 429 after too many attempts from the same user", async () => {
+    mockAuth.mockResolvedValue({ user: { id: RATE_LIMITED_USER } });
+    mockFindUnique.mockResolvedValue({ passwordHash: "$2b$12$hashed_old" });
+    mockBcryptCompare.mockResolvedValue(false);
+
+    let lastRes;
+    for (let i = 0; i < 6; i++) {
+      lastRes = await POST(
+        makeRequest({ currentPassword: "wrongPass", newPassword: "newPass456" })
+      );
+    }
+
+    expect(lastRes!.status).toBe(429);
   });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import type { NormalizedOffer } from "@/lib/duffel/types";
 
@@ -264,5 +264,33 @@ describe("POST /api/booking", () => {
     const body = await res.json();
     expect(body.booking.status).toBe("failed");
     expect(body.booking.duffelOrderId).toBeNull();
+  });
+});
+
+describe("POST /api/booking rate limiting (outside test NODE_ENV)", () => {
+  const RATE_LIMITED_USER = "usr_rate_limit_target";
+
+  beforeEach(() => {
+    vi.stubEnv("NODE_ENV", "production");
+  });
+
+  afterEach(() => {
+    vi.stubEnv("NODE_ENV", "test");
+  });
+
+  it("returns 429 after too many booking attempts from the same user", async () => {
+    mockAuth.mockResolvedValue({ user: { id: RATE_LIMITED_USER } });
+    mockPaymentIntentsRetrieve.mockResolvedValue(
+      makeSucceededPaymentIntent({ metadata: { userId: RATE_LIMITED_USER, offerId: OFFER_ID } })
+    );
+    mockGetOfferWithServices.mockResolvedValue(makeOffer());
+    mockDuffelRequest.mockResolvedValue({ id: "ord_001", booking_reference: "DUF123" });
+
+    let lastRes;
+    for (let i = 0; i < 6; i++) {
+      lastRes = await POST(makeRequest(baseBody()));
+    }
+
+    expect(lastRes!.status).toBe(429);
   });
 });

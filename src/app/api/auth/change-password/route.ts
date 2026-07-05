@@ -2,11 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (process.env.NODE_ENV !== "test") {
+    const rl = checkRateLimit(`change-password:${session.user.id}`, { max: 5, windowMs: 60_000 });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please wait before trying again." },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfter ?? 60) } }
+      );
+    }
   }
 
   const body = (await req.json()) as {

@@ -5,6 +5,7 @@ import { duffelRequest, DuffelError } from "@/lib/duffel/client";
 import { getOfferWithServices } from "@/lib/duffel/search";
 import type { SearchParams } from "@/lib/parser/types";
 import { getStripe } from "@/lib/stripe";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export interface BookingPassenger {
   id: string;
@@ -29,6 +30,16 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (process.env.NODE_ENV !== "test") {
+    const rl = checkRateLimit(`booking:${session.user.id}`, { max: 5, windowMs: 60_000 });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "Too many booking attempts. Please wait before trying again." },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfter ?? 60) } }
+      );
+    }
   }
 
   const body = (await req.json()) as CreateBookingBody;
