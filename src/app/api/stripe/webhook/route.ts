@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
+import type Stripe from "stripe";
 import { db } from "@/lib/db";
 import { sendBookingConfirmations } from "@/lib/notifications";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+import { getStripe } from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -11,7 +10,7 @@ export async function POST(req: NextRequest) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(
+    event = getStripe().webhooks.constructEvent(
       rawBody,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET ?? ""

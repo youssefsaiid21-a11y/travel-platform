@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
 import { auth } from "@/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+import { getStripe } from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -37,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntent = await getStripe().paymentIntents.create({
       amount: amountCents,
       currency: currency.toLowerCase(),
       metadata: { userId: session.user.id, offerId },

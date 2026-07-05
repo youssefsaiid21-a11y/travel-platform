@@ -4,9 +4,7 @@ import { db } from "@/lib/db";
 import { duffelRequest } from "@/lib/duffel/client";
 import type { NormalizedOffer } from "@/lib/duffel/types";
 import type { SearchParams } from "@/lib/parser/types";
-import Stripe from "stripe";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+import { getStripe } from "@/lib/stripe";
 
 export interface BookingPassenger {
   id: string;
@@ -38,7 +36,7 @@ export async function POST(req: NextRequest) {
   const { offerId, offer, searchParams, passengers, stripePaymentIntentId, specialRequests } = body;
 
   // Verify payment succeeded before touching Duffel (CLAUDE.md guardrail #2)
-  const pi = await stripe.paymentIntents.retrieve(stripePaymentIntentId);
+  const pi = await getStripe().paymentIntents.retrieve(stripePaymentIntentId);
   if (pi.status !== "succeeded") {
     return NextResponse.json(
       { error: "Payment has not been confirmed." },
