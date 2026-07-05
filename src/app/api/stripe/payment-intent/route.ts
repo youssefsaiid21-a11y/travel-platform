@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getStripe } from "@/lib/stripe";
+import { getOfferWithServices } from "@/lib/duffel/search";
+import { DuffelError } from "@/lib/duffel/client";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -19,25 +21,38 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { amount, currency, offerId } = (await req.json()) as {
-    amount: string;
-    currency: string;
-    offerId: string;
-  };
+  const { offerId } = (await req.json()) as { offerId: string };
 
-  if (!amount || !currency || !offerId) {
+  if (!offerId) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
-  const amountCents = Math.round(parseFloat(amount) * 100);
-  if (isNaN(amountCents) || amountCents <= 0) {
-    return NextResponse.json({ error: "Invalid amount." }, { status: 400 });
+  // The amount charged must come from Duffel's own live offer, never from
+  // the client - a client-supplied amount would let a user pay $0.01 for
+  // a real fare while still presenting the genuine offerId (CLAUDE.md
+  // guardrail #2: money-moving code needs a real, unspoofable price check).
+  let offer;
+  try {
+    offer = await getOfferWithServices(offerId);
+  } catch (err) {
+    if (err instanceof DuffelError) {
+      return NextResponse.json(
+        { error: "That offer is no longer available. Please search again." },
+        { status: 410 }
+      );
+    }
+    return NextResponse.json({ error: "Could not verify the offer price." }, { status: 502 });
+  }
+
+  const amountCents = Math.round(parseFloat(offer.total_amount) * 100);
+  if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    return NextResponse.json({ error: "Invalid offer amount." }, { status: 400 });
   }
 
   try {
     const paymentIntent = await getStripe().paymentIntents.create({
       amount: amountCents,
-      currency: currency.toLowerCase(),
+      currency: offer.total_currency.toLowerCase(),
       metadata: { userId: session.user.id, offerId },
     });
     return NextResponse.json({ clientSecret: paymentIntent.client_secret });

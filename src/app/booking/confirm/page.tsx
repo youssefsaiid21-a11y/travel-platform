@@ -265,11 +265,7 @@ export default function ConfirmPage() {
     const res = await fetch("/api/stripe/payment-intent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amount: pending.offer.total_amount,
-        currency: pending.offer.total_currency,
-        offerId: pending.offer.id,
-      }),
+      body: JSON.stringify({ offerId: pending.offer.id }),
     });
 
     if (!res.ok) {
