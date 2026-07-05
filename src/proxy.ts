@@ -20,7 +20,8 @@ function buildCsp(nonce: string) {
     // Inline `style={{...}}` attributes have no CSP nonce mechanism (only
     // <style> elements do), so this has to stay 'unsafe-inline'.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    // assets.duffel.com serves the airline logos in offer.owner.logo_symbol_url.
+    "img-src 'self' data: https://assets.duffel.com",
     "font-src 'self'",
     "connect-src 'self' https://api.stripe.com",
     "frame-src https://js.stripe.com https://hooks.stripe.com",
