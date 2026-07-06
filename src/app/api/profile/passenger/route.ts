@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { passengerDocFieldFormatError } from "@/lib/passengerValidation";
 
 export async function GET() {
   const session = await auth();
@@ -39,6 +40,11 @@ export async function POST(req: NextRequest) {
 
   if (!givenName || !familyName || !bornOn || !gender || !title || !phone) {
     return NextResponse.json({ error: "All fields required" }, { status: 400 });
+  }
+
+  const docFormatError = passengerDocFieldFormatError({ nationality, passportExpiry });
+  if (docFormatError) {
+    return NextResponse.json({ error: docFormatError }, { status: 400 });
   }
 
   // Passport/nationality are nullable at this layer (a profile saved before

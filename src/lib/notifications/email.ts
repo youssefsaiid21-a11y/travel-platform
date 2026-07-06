@@ -1,5 +1,21 @@
 import type { BookingNotificationData, PriceDropNotificationData } from "./index";
 
+// Every other value interpolated into these templates is either
+// system-controlled (IATA codes, formatted prices/dates) or already
+// constrained by passengerValidationError's format checks - passengerName
+// is the one field built from free-text given_name/family_name input
+// (passengerValidation.ts only checks those are non-empty, no character
+// allowlist), so it's the one value here that needs escaping before going
+// into an HTML string.
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function formatPrice(amount: string, currency: string): string {
   try {
     return new Intl.NumberFormat("en-GB", {
@@ -45,7 +61,7 @@ function buildHtml(data: BookingNotificationData): string {
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:12px">
           <span style="font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Passenger</span>
-          <span style="font-size:14px;color:#0f172a">${data.passengerName}</span>
+          <span style="font-size:14px;color:#0f172a">${escapeHtml(data.passengerName)}</span>
         </div>
         <div style="border-top:1px solid #e2e8f0;margin:12px 0"></div>
         <div style="display:flex;justify-content:space-between">
@@ -89,7 +105,15 @@ export async function sendConfirmationEmail(data: BookingNotificationData): Prom
   });
 
   if (!res.ok) {
-    console.error("[notifications/email] Resend error:", res.status, await res.text().catch(() => ""));
+    // Truncated: Resend/Twilio error bodies routinely echo back the invalid
+    // recipient (email/phone) in their message - capping this keeps enough
+    // to diagnose the failure class without landing a customer's full
+    // contact info in logs via an indirect path.
+    console.error(
+      "[notifications/email] Resend error:",
+      res.status,
+      (await res.text().catch(() => "")).slice(0, 300)
+    );
   }
 }
 
@@ -164,6 +188,14 @@ export async function sendPriceDropEmail(data: PriceDropNotificationData): Promi
   });
 
   if (!res.ok) {
-    console.error("[notifications/email] Resend error:", res.status, await res.text().catch(() => ""));
+    // Truncated: Resend/Twilio error bodies routinely echo back the invalid
+    // recipient (email/phone) in their message - capping this keeps enough
+    // to diagnose the failure class without landing a customer's full
+    // contact info in logs via an indirect path.
+    console.error(
+      "[notifications/email] Resend error:",
+      res.status,
+      (await res.text().catch(() => "")).slice(0, 300)
+    );
   }
 }

@@ -331,6 +331,31 @@ describe("nlParse - 10 NL query fixtures", () => {
     ]);
   });
 
+  it("fails gracefully instead of crashing when a multi-city leg omits a required field", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        destination: "CDG",
+        departure_date: "2026-10-01",
+        passengers: [{ type: "adult", count: 1 }],
+        additional_slices: [
+          // Second leg is missing destination - same class of
+          // non-conforming-proxy response the top-level guard already
+          // handles, applied per-leg.
+          { origin: "CDG", departure_date: "2026-10-05" },
+        ],
+      })
+    );
+    const { params, error, answer } = await nlParse(
+      "London to Paris on Oct 1, then somewhere on Oct 5",
+      [],
+      null
+    );
+    expect(params).toBeNull();
+    expect(answer).toBeNull();
+    expect(error).toBeTruthy();
+  });
+
   it("drops a stale carried-forward return_date when additional_slices is set", async () => {
     mockCreate.mockResolvedValueOnce(
       makeToolResponse({

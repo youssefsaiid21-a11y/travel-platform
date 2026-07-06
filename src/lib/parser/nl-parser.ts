@@ -326,6 +326,29 @@ export async function nlParse(
   const hasAdditionalSlices =
     Array.isArray(input.additional_slices) && input.additional_slices.length > 0;
 
+  // Same reasoning as the top-level origin/departure_date check above - the
+  // tool schema's per-leg "required" fields aren't an enforced contract
+  // either. Without this, a leg missing origin/destination throws an
+  // uncaught TypeError on `.toUpperCase()` below (surfaces as a generic
+  // "Something went wrong" instead of the friendly retry path), and a leg
+  // missing departure_date silently produces `departure_date: undefined`
+  // that skips validateParams' chronological-order check entirely
+  // (`undefined < string` is always false in JS) and would reach Duffel
+  // with a slice missing a required field.
+  if (
+    hasAdditionalSlices &&
+    (input.additional_slices as unknown[]).some(
+      (s) =>
+        typeof s !== "object" ||
+        s === null ||
+        typeof (s as Record<string, unknown>).origin !== "string" ||
+        typeof (s as Record<string, unknown>).destination !== "string" ||
+        typeof (s as Record<string, unknown>).departure_date !== "string"
+    )
+  ) {
+    return { params: null, error: "Could not parse flight search from your message.", answer: null, exploreParams: null };
+  }
+
   const params: SearchParams = {
     origin: input.origin.toUpperCase().slice(0, 3),
     destination: (input.destination as string).toUpperCase().slice(0, 3),

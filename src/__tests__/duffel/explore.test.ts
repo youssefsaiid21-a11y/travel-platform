@@ -139,6 +139,21 @@ describe("exploreDestinations", () => {
     expect(destinations).not.toContain("CDG");
   });
 
+  it("still searches every popular destination despite batching in groups of 10 internally", async () => {
+    // POPULAR_DESTINATIONS has 26 entries - more than one batch - so this
+    // exercises the chunking loop for real instead of asserting against a
+    // fake oversized list.
+    vi.mocked(duffelRequest).mockResolvedValue(makeApiResponse([makeRawOffer("off", "100.00")]));
+
+    await exploreDestinations(BASE_EXPLORE_PARAMS);
+
+    const { POPULAR_DESTINATIONS } = await import("@/lib/airlines/popularDestinations");
+    const expectedCount = POPULAR_DESTINATIONS.filter(
+      (d) => d.iata !== BASE_EXPLORE_PARAMS.origin
+    ).length;
+    expect(vi.mocked(duffelRequest)).toHaveBeenCalledTimes(expectedCount);
+  });
+
   it("filters out destinations above max_budget", async () => {
     mockPerDestination();
 

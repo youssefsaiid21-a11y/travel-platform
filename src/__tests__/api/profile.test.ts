@@ -164,4 +164,22 @@ describe("POST /api/profile/passenger", () => {
       })
     );
   });
+
+  it("rejects a nationality that isn't a valid 2-letter code, even though passport fields are otherwise optional", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: MOCK_USER_ID } });
+    const res = await POST(
+      makeRequest("POST", { ...VALID_BODY, nationality: "United Kingdom" })
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unparseable passport expiry date", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: MOCK_USER_ID } });
+    const res = await POST(
+      makeRequest("POST", { ...VALID_BODY, passportExpiry: "not-a-date" })
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpsert).not.toHaveBeenCalled();
+  });
 });

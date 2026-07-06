@@ -16,8 +16,19 @@ export async function exploreDestinations(
 ): Promise<ExploreDestinationResult[]> {
   const candidates = POPULAR_DESTINATIONS.filter((d) => d.iata !== params.origin);
 
-  const results = await Promise.all(
-    candidates.map(async (dest): Promise<ExploreDestinationResult | null> => {
+  // Same reasoning as the price-drop cron's batching: each candidate is one
+  // live Duffel search, so firing all of them at once means one slow
+  // destination stalls the whole request (nothing here races against a
+  // timeout) and this request's latency/cost scales with the destination
+  // list's size, not a fixed budget. Bounded at 26 entries today (harmless),
+  // but batching costs nothing and stops that from becoming a problem if
+  // the list grows.
+  const BATCH_SIZE = 10;
+  const results: (ExploreDestinationResult | null)[] = [];
+  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+    const batch = candidates.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(
+    batch.map(async (dest): Promise<ExploreDestinationResult | null> => {
       const searchParams: SearchParams = {
         origin: params.origin,
         destination: dest.iata,
@@ -54,7 +65,9 @@ export async function exploreDestinations(
         return null;
       }
     })
-  );
+    );
+    results.push(...batchResults);
+  }
 
   return results
     .filter((r): r is ExploreDestinationResult => r !== null)

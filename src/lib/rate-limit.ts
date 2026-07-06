@@ -37,6 +37,23 @@ export function checkRateLimit(
   return { ok: true };
 }
 
+// A reverse proxy (Vercel's edge included) APPENDS the IP it actually
+// observed connecting to it onto x-forwarded-for - it does not overwrite
+// index 0. A client can freely set its own x-forwarded-for on the original
+// request, so trusting the FIRST entry (as this used to) makes the rate
+// limit's key attacker-chosen: rotate a fake value every request and every
+// request lands in a fresh bucket, bypassing the limit entirely. The last
+// entry is the one Vercel's own edge appended and can't be spoofed by the
+// client - that's the one to trust.
+export function getClientIp(req: NextRequest): string {
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    const parts = forwardedFor.split(",").map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+  return req.headers.get("x-real-ip") ?? "unknown";
+}
+
 // Shared by API routes that rate-limit per client IP. Returns a 429 response
 // to send as-is when the caller is over budget, or null when it's fine to proceed.
 // `routeKey` namespaces the budget so unrelated routes (e.g. chat search vs.
@@ -44,11 +61,7 @@ export function checkRateLimit(
 export function enforceRateLimit(req: NextRequest, routeKey: string): NextResponse | null {
   if (process.env.NODE_ENV === "test") return null;
 
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    req.headers.get("x-real-ip") ??
-    "unknown";
-  const rl = checkRateLimit(`${routeKey}:${ip}`);
+  const rl = checkRateLimit(`${routeKey}:${getClientIp(req)}`);
   if (rl.ok) return null;
 
   return NextResponse.json(

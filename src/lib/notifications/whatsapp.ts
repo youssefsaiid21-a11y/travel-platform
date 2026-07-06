@@ -55,7 +55,13 @@ export async function sendConfirmationWhatsApp(data: BookingNotificationData): P
   );
 
   if (!res.ok) {
-    console.error("[notifications/whatsapp] Twilio error:", res.status, await res.text().catch(() => ""));
+    // Truncated - Twilio error bodies routinely echo back the invalid `To`
+    // phone number in their message field.
+    console.error(
+      "[notifications/whatsapp] Twilio error:",
+      res.status,
+      (await res.text().catch(() => "")).slice(0, 300)
+    );
   }
 }
 
@@ -100,6 +106,12 @@ export async function sendPriceDropWhatsApp(data: PriceDropNotificationData): Pr
   );
 
   if (!res.ok) {
-    console.error("[notifications/whatsapp] Twilio error:", res.status, await res.text().catch(() => ""));
+    // Truncated - Twilio error bodies routinely echo back the invalid `To`
+    // phone number in their message field.
+    console.error(
+      "[notifications/whatsapp] Twilio error:",
+      res.status,
+      (await res.text().catch(() => "")).slice(0, 300)
+    );
   }
 }

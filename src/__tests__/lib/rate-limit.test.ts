@@ -1,11 +1,47 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 // Isolate the module so each describe block gets a fresh store
 let checkRateLimit: typeof import("@/lib/rate-limit").checkRateLimit;
+let getClientIp: typeof import("@/lib/rate-limit").getClientIp;
 
 beforeEach(async () => {
   vi.resetModules();
-  ({ checkRateLimit } = await import("@/lib/rate-limit"));
+  ({ checkRateLimit, getClientIp } = await import("@/lib/rate-limit"));
+});
+
+function makeRequest(headers: Record<string, string>) {
+  return new NextRequest("http://localhost/api/test", { headers });
+}
+
+describe("getClientIp", () => {
+  it("uses the LAST entry of x-forwarded-for, not the first", () => {
+    // A reverse proxy appends the IP it actually observed onto the end of
+    // whatever x-forwarded-for it received - the first entry is whatever
+    // the client itself claimed, which is exactly what a spoofing client
+    // controls. Trusting index 0 (the old bug) makes the rate-limit key
+    // attacker-chosen.
+    const ip = getClientIp(
+      makeRequest({ "x-forwarded-for": "1.2.3.4, 9.9.9.9" })
+    );
+    expect(ip).toBe("9.9.9.9");
+  });
+
+  it("falls back to x-real-ip when x-forwarded-for is absent", () => {
+    const ip = getClientIp(makeRequest({ "x-real-ip": "5.6.7.8" }));
+    expect(ip).toBe("5.6.7.8");
+  });
+
+  it("falls back to \"unknown\" when neither header is present", () => {
+    expect(getClientIp(makeRequest({}))).toBe("unknown");
+  });
+
+  it("trims whitespace around the trusted entry", () => {
+    const ip = getClientIp(
+      makeRequest({ "x-forwarded-for": "1.2.3.4,   9.9.9.9  " })
+    );
+    expect(ip).toBe("9.9.9.9");
+  });
 });
 
 describe("checkRateLimit", () => {

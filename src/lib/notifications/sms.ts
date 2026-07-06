@@ -51,7 +51,13 @@ export async function sendConfirmationSms(data: BookingNotificationData): Promis
   );
 
   if (!res.ok) {
-    console.error("[notifications/sms] Twilio error:", res.status, await res.text().catch(() => ""));
+    // Truncated - Twilio error bodies routinely echo back the invalid `To`
+    // phone number in their message field.
+    console.error(
+      "[notifications/sms] Twilio error:",
+      res.status,
+      (await res.text().catch(() => "")).slice(0, 300)
+    );
   }
 }
 
@@ -91,6 +97,12 @@ export async function sendPriceDropSms(data: PriceDropNotificationData): Promise
   );
 
   if (!res.ok) {
-    console.error("[notifications/sms] Twilio error:", res.status, await res.text().catch(() => ""));
+    // Truncated - Twilio error bodies routinely echo back the invalid `To`
+    // phone number in their message field.
+    console.error(
+      "[notifications/sms] Twilio error:",
+      res.status,
+      (await res.text().catch(() => "")).slice(0, 300)
+    );
   }
 }

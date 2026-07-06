@@ -47,3 +47,23 @@ export function passengerValidationError(
   }
   return null;
 }
+
+// Format-only check for a partial save (POST /api/profile/passenger allows
+// saving name/DOB/phone before the user has entered passport details yet -
+// that's a valid intermediate state, unlike at booking time where
+// passengerValidationError requires every field). A field that's simply
+// absent is fine here; a field that's present but malformed is not - this
+// is what stops garbage like nationality: "United Kingdom" (not a code) or
+// passportExpiry: "not-a-date" from being silently persisted.
+export function passengerDocFieldFormatError(fields: {
+  nationality?: string | null;
+  passportExpiry?: string | null;
+}): string | null {
+  if (fields.nationality && !ISO_COUNTRY_RE.test(fields.nationality)) {
+    return "Nationality must be a valid 2-letter country code.";
+  }
+  if (fields.passportExpiry && Number.isNaN(Date.parse(fields.passportExpiry))) {
+    return "Passport expiry must be a valid date.";
+  }
+  return null;
+}
