@@ -23,4 +23,5 @@
   color: var(--success);
   border-color: rgba(5, 150, 105, 0.3);
   background: var(--success-bg);
+  animation: confirmPop 0.3s ease-out both;
 }

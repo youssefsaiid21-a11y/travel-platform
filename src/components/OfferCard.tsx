@@ -536,6 +536,7 @@ export function OfferCard({
   onSelect?: (offer: NormalizedOffer) => void;
   tag?: OfferTag;
 }) {
+  const [selecting, setSelecting] = useState(false);
   const totalPax = offer.passengers.length;
   const perPaxAmount = totalPax > 1
     ? formatPrice(String(parseFloat(offer.total_amount) / totalPax), offer.total_currency)
@@ -606,11 +607,28 @@ export function OfferCard({
         </div>
         {onSelect && (
           <button
-            className={styles.selectBtn}
-            onClick={() => onSelect(offer)}
+            className={`${styles.selectBtn} ${selecting ? styles.selectBtnSelecting : ""}`}
+            disabled={selecting}
+            onClick={() => {
+              if (selecting) return;
+              // Instant tactile feedback - the page transition to
+              // /booking/confirm takes a moment to kick in, and a booking
+              // flow shouldn't leave a click feeling unacknowledged.
+              setSelecting(true);
+              try {
+                onSelect(offer);
+              } catch (err) {
+                // onSelect writes to localStorage before navigating - if
+                // that throws (e.g. Safari private browsing), navigation
+                // never happens, so the button must not stay stuck
+                // disabled forever with no way to retry.
+                console.error("Failed to select offer:", err);
+                setSelecting(false);
+              }
+            }}
             aria-label={`Select ${offer.owner.name} - ${formatPrice(offer.total_amount, offer.total_currency)}`}
           >
-            Select →
+            {selecting ? "Selecting…" : "Select →"}
           </button>
         )}
       </div>

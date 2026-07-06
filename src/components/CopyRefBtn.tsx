@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useTemporaryFlag } from "@/lib/useTemporaryFlag";
 import styles from "./CopyRefBtn.module.css";
 
 export function CopyRefBtn({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, markCopied] = useTemporaryFlag();
 
   async function handleCopy() {
     try {
@@ -20,8 +20,7 @@ export function CopyRefBtn({ value }: { value: string }) {
         document.execCommand("copy");
         document.body.removeChild(ta);
       }
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      markCopied();
     } catch { /* ignore */ }
   }
 

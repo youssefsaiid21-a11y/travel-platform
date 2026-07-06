@@ -8,7 +8,7 @@ vi.mock("openai", () => ({
   },
 }));
 
-import { nlParse, validateParams, validateExploreParams } from "@/lib/parser/nl-parser";
+import { nlParse, validateParams, validateExploreParams, generateSearchReply } from "@/lib/parser/nl-parser";
 
 function makeToolResponse(args: Record<string, unknown>, toolName = "extract_flight_search") {
   return {
@@ -648,5 +648,69 @@ describe("validateParams - parameter validation", () => {
       ],
     });
     expect(err).toMatch(/doesn't connect/i);
+  });
+});
+
+describe("generateSearchReply - token streaming", () => {
+  beforeEach(() => {
+    mockCreate.mockReset();
+  });
+
+  const params = {
+    origin: "LHR",
+    destination: "NRT",
+    departure_date: "2026-08-01",
+    passengers: [{ type: "adult" as const, count: 1 }],
+  };
+
+  function makeStream(chunks: string[], thenThrow?: Error) {
+    return {
+      async *[Symbol.asyncIterator]() {
+        for (const c of chunks) {
+          yield { choices: [{ delta: { content: c } }] };
+        }
+        if (thenThrow) throw thenThrow;
+      },
+    };
+  }
+
+  it("streams every chunk via onDelta and resolves to the full assembled text", async () => {
+    mockCreate.mockResolvedValueOnce(makeStream(["Found ", "3 flights ", "to Tokyo."]));
+    const deltas: string[] = [];
+
+    const result = await generateSearchReply(
+      "flights to Tokyo", params, 3, "500.00", "GBP", "ANA", false, null,
+      (delta) => deltas.push(delta)
+    );
+
+    expect(deltas.join("")).toBe("Found 3 flights to Tokyo.");
+    expect(result).toBe("Found 3 flights to Tokyo.");
+  });
+
+  it("prefers already-streamed partial content over the template when the stream errors mid-way", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeStream(["Found 3 flights"], new Error("connection dropped"))
+    );
+    const deltas: string[] = [];
+
+    const result = await generateSearchReply(
+      "flights to Tokyo", params, 3, "500.00", "GBP", "ANA", false, null,
+      (delta) => deltas.push(delta)
+    );
+
+    // The user already watched this text stream in - falling back to the
+    // unrelated template here would contradict what they just saw.
+    expect(deltas.join("")).toBe("Found 3 flights");
+    expect(result).toBe("Found 3 flights");
+  });
+
+  it("falls back to the template when the stream errors before anything arrives", async () => {
+    mockCreate.mockResolvedValueOnce(makeStream([], new Error("immediate failure")));
+
+    const result = await generateSearchReply(
+      "flights to Tokyo", params, 3, "500.00", "GBP", "ANA", false, null
+    );
+
+    expect(result).toMatch(/Found 3 flights/i);
   });
 });

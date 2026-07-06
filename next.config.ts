@@ -20,6 +20,13 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  experimental: {
+    // Lets React's <ViewTransition> (used in layout.tsx) drive route-change
+    // crossfades via the browser's native View Transitions API - no client
+    // animation library needed. Ships in Next's own bundled React build;
+    // @types/react doesn't know about it yet, hence src/types/react-view-transition.d.ts.
+    viewTransition: true,
+  },
 };
 
 export default nextConfig;

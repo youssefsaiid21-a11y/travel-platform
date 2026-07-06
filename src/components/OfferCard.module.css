@@ -7,6 +7,7 @@
   transition: box-shadow 0.2s, transform 0.2s;
   backdrop-filter: blur(16px) saturate(160%);
   box-shadow: var(--shadow-md);
+  animation: fadeInUp 0.28s ease-out both;
 }
 
 .card:hover {
@@ -280,6 +281,15 @@
   transform: scale(1.04);
 }
 
+/* Compound selector (not just .selectBtnSelecting) so this ties
+   .selectBtn:hover's specificity and wins on source order - the cursor is
+   almost always still over the button right after a click. */
+.selectBtn.selectBtnSelecting {
+  transform: scale(0.97);
+  opacity: 0.85;
+  cursor: default;
+}
+
 /* ── Mobile ── */
 @media (max-width: 480px) {
   .header {
@@ -433,16 +443,9 @@
 }
 
 /* ── Skeleton ── */
-@keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
-}
-
 .skeletonLine {
+  composes: skeleton-shimmer from global;
   border-radius: var(--r-sm);
-  background: linear-gradient(90deg, rgba(2, 132, 199, 0.06) 25%, rgba(2, 132, 199, 0.12) 50%, rgba(2, 132, 199, 0.06) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
 }
 
 .skeleton .header {

@@ -1,8 +1,3 @@
-@keyframes shimmer {
-  0% { background-position: -600px 0; }
-  100% { background-position: 600px 0; }
-}
-
 .page {
   flex: 1;
   padding: 2rem 1rem 3rem;
@@ -17,14 +12,7 @@
 }
 
 .skel {
-  background: linear-gradient(
-    90deg,
-    rgba(2, 132, 199, 0.06) 25%,
-    rgba(2, 132, 199, 0.12) 37%,
-    rgba(2, 132, 199, 0.06) 63%
-  );
-  background-size: 1200px 100%;
-  animation: shimmer 1.4s ease infinite;
+  composes: skeleton-shimmer from global;
   border-radius: var(--r-md);
 }
 

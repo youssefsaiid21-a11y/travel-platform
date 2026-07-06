@@ -135,6 +135,37 @@ body::before {
       transparent 55%);
 }
 
+/* ── Shared motion primitives ──────────────────────────
+   One fade+slide-in used for every "new content just
+   appeared" moment (chat bubbles, offer cards, chips) so
+   state changes read as continuous instead of popping in,
+   and one shimmer recipe shared by every skeleton loader
+   instead of four near-identical copies.
+─────────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Success confirmation "pop" - for the moment an action is confirmed
+   (price tracked, etc.), distinct from fadeInUp's plain entrance. */
+@keyframes confirmPop {
+  0% { opacity: 0; transform: scale(0.85); }
+  60% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, rgba(2, 132, 199, 0.06) 25%, rgba(2, 132, 199, 0.12) 50%, rgba(2, 132, 199, 0.06) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
 a {
   color: inherit;
   text-decoration: none;

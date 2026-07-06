@@ -439,7 +439,12 @@ export async function generateSearchReply(
   cheapestCurrency: string | null,
   cheapestAirline: string | null,
   dateWasAdjusted: boolean,
-  preferenceNote?: string | null
+  preferenceNote?: string | null,
+  // Called with each token chunk as it streams in, so the client can render
+  // the reply progressively instead of waiting for the whole thing - the
+  // returned Promise still resolves to the complete text (for session
+  // history and the SSE "done" event's authoritative reply field).
+  onDelta?: (delta: string) => void
 ): Promise<string> {
   const routeDescription = params.additional_slices?.length
     ? [params.origin, params.destination, ...params.additional_slices.map((s) => s.destination)].join(" → ")
@@ -463,8 +468,11 @@ export async function generateSearchReply(
     : "";
   const prefNote = preferenceNote ? ` ${preferenceNote}` : "";
 
+  // Declared outside the try so a mid-stream error can still recover
+  // whatever was already streamed to the client - see catch block below.
+  let content = "";
   try {
-    const resp = await client.chat.completions.create({
+    const stream = await client.chat.completions.create({
       model: MODEL,
       messages: [
         {
@@ -480,11 +488,31 @@ export async function generateSearchReply(
         },
       ],
       max_tokens: 80,
+      stream: true,
     });
-    const content = resp.choices[0]?.message?.content?.trim();
-    if (content && content.length > 10) return content;
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) {
+        content += delta;
+        onDelta?.(delta);
+      }
+    }
+    content = content.trim();
+    // Once tokens have already streamed to the client, replacing a
+    // suspiciously-short result with the template would flicker/contradict
+    // what the user just watched appear - only bail out to the template
+    // when the model produced nothing at all (e.g. request errored).
+    if (content) return content;
   } catch {
-    // fall through to template
+    // A mid-stream error (e.g. the connection drops) after real tokens
+    // already streamed to the client is different from an error before
+    // anything arrived: falling back to an unrelated template here would
+    // contradict what the user just watched appear, so prefer whatever
+    // was already accumulated over the template if it's non-empty.
+    const partial = content.trim();
+    if (partial) return partial;
+    // else fall through to template - nothing was ever shown to the user
   }
 
   // Template fallback

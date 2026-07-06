@@ -127,6 +127,9 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
   const [statusStep, setStatusStep] = useState("");
+  // Accumulates "reply_token" SSE chunks so the assistant's reply renders
+  // progressively instead of popping in whole once "done" arrives.
+  const [streamingReply, setStreamingReply] = useState("");
   // Both of these read browser storage, so they must start at the same
   // value the server rendered (undefined/[]) and only pick up the real
   // value in an effect after mount - reading storage inside the useState
@@ -151,7 +154,6 @@ export default function Home() {
   // clicked (server-persisted via /api/tracked-searches - this Set is just
   // local UI state so the button can flip to a confirmed state).
   const [trackedMessageIdx, setTrackedMessageIdx] = useState<Set<number>>(new Set());
-  const [trackingMessageIdx, setTrackingMessageIdx] = useState<number | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -175,6 +177,7 @@ export default function Home() {
       setLoading(true);
       setStatusMsg(STEP_LABELS.parsing);
       setStatusStep("parsing");
+      setStreamingReply("");
 
       try {
         const res = await fetch("/api/chat", {
@@ -221,6 +224,8 @@ export default function Home() {
               if (evt === "status") {
                 setStatusMsg((data.message as string) ?? "");
                 setStatusStep((data.step as string) ?? "");
+              } else if (evt === "reply_token") {
+                setStreamingReply((prev) => prev + ((data.delta as string) ?? ""));
               } else if (evt === "done") {
                 const body = data as unknown as ChatResponse;
                 if (body.session_id) setSessionId(body.session_id);
@@ -247,6 +252,7 @@ export default function Home() {
                 }
                 setStatusMsg("");
                 setStatusStep("");
+                setStreamingReply("");
               } else if (evt === "error") {
                 setMessages((prev) => [
                   ...prev,
@@ -257,6 +263,7 @@ export default function Home() {
                 ]);
                 setStatusMsg("");
                 setStatusStep("");
+                setStreamingReply("");
               }
 
               evt = "";
@@ -270,6 +277,7 @@ export default function Home() {
         ]);
         setStatusMsg("");
         setStatusStep("");
+        setStreamingReply("");
       } finally {
         setLoading(false);
         setTimeout(() => inputRef.current?.focus(), 50);
@@ -466,15 +474,11 @@ export default function Home() {
                     <div className={styles.trackPriceRow}>
                       <button
                         type="button"
-                        className={styles.trackPriceBtn}
-                        disabled={trackingMessageIdx === i || trackedMessageIdx.has(i)}
+                        className={`${styles.trackPriceBtn} ${trackedMessageIdx.has(i) ? styles.trackPriceBtnTracked : ""}`}
+                        disabled={trackedMessageIdx.has(i)}
                         onClick={() => handleTrackPrice(i, msg.offers!, msg.searchParams!)}
                       >
-                        {trackedMessageIdx.has(i)
-                          ? "Tracking this price"
-                          : trackingMessageIdx === i
-                            ? "Saving…"
-                            : "Track this price"}
+                        {trackedMessageIdx.has(i) ? "✓ Tracking this price" : "Track this price"}
                       </button>
                     </div>
                   )}
@@ -504,7 +508,11 @@ export default function Home() {
               <div className={styles.assistantAvatar}>O</div>
               <span className={styles.assistantLabel}>Orbi</span>
             </div>
-            {statusMsg ? (
+            {streamingReply ? (
+              <div className={styles.assistantBubble}>
+                <p>{streamingReply}</p>
+              </div>
+            ) : statusMsg ? (
               <div className={styles.statusBubble}>
                 <span className={styles.statusSpinner} />
                 <span className={styles.statusText}>{statusMsg}</span>
@@ -604,13 +612,16 @@ export default function Home() {
       router.push("/login?callbackUrl=/");
       return;
     }
-    if (trackingMessageIdx !== null || trackedMessageIdx.has(messageIdx)) return;
+    if (trackedMessageIdx.has(messageIdx)) return;
 
     const cheapest = offers.reduce((min, o) =>
       parseFloat(o.total_amount) < parseFloat(min.total_amount) ? o : min
     , offers[0]);
 
-    setTrackingMessageIdx(messageIdx);
+    // Optimistic: this is a non-monetary save, not a booking, so it's safe to
+    // show "tracked" instantly and roll back on failure rather than making
+    // the user wait on the round-trip to see confirmation.
+    setTrackedMessageIdx((prev) => new Set(prev).add(messageIdx));
     try {
       const res = await fetch("/api/tracked-searches", {
         method: "POST",
@@ -621,13 +632,19 @@ export default function Home() {
           cheapestCurrency: cheapest.total_currency,
         }),
       });
-      if (res.ok) {
-        setTrackedMessageIdx((prev) => new Set(prev).add(messageIdx));
+      if (!res.ok) {
+        setTrackedMessageIdx((prev) => {
+          const next = new Set(prev);
+          next.delete(messageIdx);
+          return next;
+        });
       }
     } catch {
-      // Best-effort - the button just stays in its untracked state on failure.
-    } finally {
-      setTrackingMessageIdx(null);
+      setTrackedMessageIdx((prev) => {
+        const next = new Set(prev);
+        next.delete(messageIdx);
+        return next;
+      });
     }
   }
 

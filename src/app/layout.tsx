@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ViewTransition } from "react";
 import { SessionProvider } from "next-auth/react";
 import { auth } from "@/auth";
 import NavBar from "@/components/NavBar";
@@ -34,7 +35,7 @@ export default async function RootLayout({
           <a href="#main-content" className="skip-link">Skip to content</a>
           <NavBar />
           <div id="main-content" className="main-content">
-            {children}
+            <ViewTransition>{children}</ViewTransition>
           </div>
         </SessionProvider>
       </body>

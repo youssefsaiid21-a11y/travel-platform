@@ -263,7 +263,8 @@ export async function POST(req: NextRequest) {
             cheapest?.total_currency ?? null,
             cheapest?.owner.name ?? null,
             dateAdjusted,
-            filterNote
+            filterNote,
+            (delta) => push("reply_token", { delta })
           ),
         ]);
 

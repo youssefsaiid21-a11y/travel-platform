@@ -43,56 +43,49 @@
   gap: 0.35rem;
 }
 
-@keyframes shimmer {
-  0% { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
-}
-
 .skeletonHeading,
 .skeletonTitle,
 .skeletonLabel,
 .skeletonValue,
 .skeletonFieldLabel,
 .skeletonFieldValue {
-  background: linear-gradient(
-    90deg,
-    rgba(2, 132, 199, 0.06) 25%,
-    rgba(2, 132, 199, 0.12) 37%,
-    rgba(2, 132, 199, 0.06) 63%
-  );
-  background-size: 800px 100%;
-  animation: shimmer 1.4s ease infinite;
   border-radius: var(--r-md);
 }
 
 .skeletonHeading {
+  composes: skeleton-shimmer from global;
   width: 100px;
   height: 28px;
   margin-bottom: 0.5rem;
 }
 
 .skeletonTitle {
+  composes: skeleton-shimmer from global;
   width: 80px;
   height: 10px;
   margin-bottom: 0.875rem;
 }
 
 .skeletonLabel {
+  composes: skeleton-shimmer from global;
   width: 60px;
   height: 14px;
 }
 
 .skeletonValue {
+  composes: skeleton-shimmer from global;
   width: 140px;
   height: 14px;
 }
 
 .skeletonFieldLabel {
+  composes: skeleton-shimmer from global;
   width: 50px;
   height: 8px;
 }
 
 .skeletonFieldValue {
+  composes: skeleton-shimmer from global;
   width: 100px;
   height: 16px;
 }

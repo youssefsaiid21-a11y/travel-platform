@@ -217,6 +217,7 @@
 .userRow {
   display: flex;
   justify-content: flex-end;
+  animation: fadeInUp 0.28s ease-out both;
 }
 
 .userBubble {
@@ -240,6 +241,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 0.5rem;
+  animation: fadeInUp 0.28s ease-out both;
 }
 
 .assistantAvatar {
@@ -324,6 +326,14 @@
   cursor: default;
 }
 
+.trackPriceBtn.trackPriceBtnTracked {
+  background: var(--success-bg);
+  border-color: var(--success);
+  color: var(--success);
+  opacity: 1;
+  animation: confirmPop 0.3s ease-out both;
+}
+
 .suggestions {
   display: flex;
   flex-wrap: wrap;
@@ -369,6 +379,7 @@
   backdrop-filter: blur(16px) saturate(160%);
   box-shadow: var(--shadow-sm);
   max-width: 80%;
+  animation: fadeInUp 0.28s ease-out both;
 }
 
 .statusSpinner {
@@ -399,6 +410,7 @@
   border-radius: 4px 16px 16px 16px;
   backdrop-filter: blur(16px) saturate(160%);
   box-shadow: var(--shadow-sm);
+  animation: fadeInUp 0.28s ease-out both;
 }
 
 .dot {

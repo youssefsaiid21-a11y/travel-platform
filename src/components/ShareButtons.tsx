@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useTemporaryFlag } from "@/lib/useTemporaryFlag";
 import styles from "./ShareButtons.module.css";
 
 interface ShareButtonsProps {
@@ -45,7 +45,7 @@ function buildMessage(p: ShareButtonsProps): string {
 }
 
 export function ShareButtons(props: ShareButtonsProps) {
-  const [copied, setCopied] = useState(false);
+  const [copied, markCopied] = useTemporaryFlag();
 
   const msg = buildMessage(props);
   const encoded = encodeURIComponent(msg);
@@ -66,8 +66,7 @@ export function ShareButtons(props: ShareButtonsProps) {
         document.execCommand("copy");
         document.body.removeChild(ta);
       }
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      markCopied();
     } catch { /* ignore */ }
   }
 
