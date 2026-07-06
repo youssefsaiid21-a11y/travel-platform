@@ -223,21 +223,51 @@ export async function nlParse(
 
   messages.push({ role: "user", content: message });
 
-  const response = await client.chat.completions.create({
-    model: MODEL,
-    messages,
-    tools: [EXTRACT_TOOL, ANSWER_TOOL],
-    tool_choice: "auto",
-  });
+  // tool_choice: "required" (not "auto") is the actual fix here - "auto"
+  // lets the model reply with plain text instead of calling either tool,
+  // which it did intermittently even for unambiguous queries like "Non-stop
+  // Sydney to London in August" (same input, parsed one attempt and failed
+  // the next). There's no valid case where neither tool applies - a
+  // non-flight message is meant to go through answer_travel_question, and
+  // an unparseable flight-shaped message goes through extract_flight_search's
+  // own `error` field - so forcing one of the two removes that failure mode
+  // instead of just retrying around it.
+  //
+  // The retry loop below is a second layer for the cases forcing tool_choice
+  // doesn't cover: some OpenAI-compatible proxies don't enforce "required"
+  // 100% of the time, and a model can still return malformed JSON in
+  // function.arguments. One retry, not a loop, so a genuinely broken
+  // request still fails fast instead of hanging.
+  let toolCallName: string | null = null;
+  let input: Record<string, unknown> | null = null;
+  let lastFailureReason = "";
+  for (let attempt = 0; attempt < 2 && !input; attempt++) {
+    const response = await client.chat.completions.create({
+      model: MODEL,
+      messages,
+      tools: [EXTRACT_TOOL, ANSWER_TOOL],
+      tool_choice: "required",
+    });
 
-  const toolCall = response.choices[0]?.message?.tool_calls?.[0];
-  if (!toolCall || toolCall.type !== "function") {
+    const toolCall = response.choices[0]?.message?.tool_calls?.[0];
+    if (!toolCall || toolCall.type !== "function") {
+      lastFailureReason = "model returned no tool call";
+      continue;
+    }
+    try {
+      input = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
+      toolCallName = toolCall.function.name;
+    } catch {
+      lastFailureReason = "model returned malformed tool-call JSON";
+    }
+  }
+
+  if (!input || !toolCallName) {
+    console.error(`nlParse: giving up after 2 attempts (${lastFailureReason})`);
     return { params: null, error: "Could not parse flight search from your message.", answer: null, exploreParams: null };
   }
 
-  const input = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
-
-  if (toolCall.function.name === "answer_travel_question") {
+  if (toolCallName === "answer_travel_question") {
     return { params: null, error: null, answer: (input.answer as string) ?? "", exploreParams: null };
   }
 
