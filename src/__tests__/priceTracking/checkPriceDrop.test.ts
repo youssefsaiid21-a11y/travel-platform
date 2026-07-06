@@ -175,6 +175,12 @@ describe("checkTrackedSearchForPriceDrop", () => {
       where: { id: "trk_1" },
       data: { lastKnownPrice: "220.00", lastKnownCurrency: "GBP" },
     });
+    // The baseline is persisted before the alert is sent, not after - so a
+    // failure sending the alert can never leave the baseline stuck, which
+    // would otherwise re-send an identical alert on the next run.
+    expect(mockUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSendPriceDropAlert.mock.invocationCallOrder[0]
+    );
   });
 
   it("does not send an alert when the price did not drop, but still refreshes the baseline", async () => {

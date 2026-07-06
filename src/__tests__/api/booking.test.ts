@@ -10,8 +10,13 @@ const mockPaymentIntentsRetrieve = vi.hoisted(() => vi.fn());
 const mockBookingCreate = vi.hoisted(() => vi.fn());
 const mockBookingUpdate = vi.hoisted(() => vi.fn());
 const mockBookingFindFirst = vi.hoisted(() => vi.fn());
+const mockSendBookingConfirmations = vi.hoisted(() => vi.fn());
 
 vi.mock("@/auth", () => ({ auth: mockAuth }));
+
+vi.mock("@/lib/notifications", () => ({
+  sendBookingConfirmations: mockSendBookingConfirmations,
+}));
 
 vi.mock("@/lib/db", () => ({
   db: {
@@ -125,6 +130,8 @@ beforeEach(() => {
   mockBookingCreate.mockReset();
   mockBookingUpdate.mockReset();
   mockBookingFindFirst.mockReset();
+  mockSendBookingConfirmations.mockReset();
+  mockSendBookingConfirmations.mockResolvedValue(undefined);
   // Default: claiming the PaymentIntent succeeds (no concurrent request has
   // already claimed it), producing a fresh "pending" row.
   mockBookingCreate.mockImplementation(async ({ data }: { data: object }) => ({
@@ -419,6 +426,38 @@ describe("POST /api/booking", () => {
     const body = await res.json();
     expect(body.booking.status).toBe("failed");
     expect(body.booking.duffelOrderId).toBeNull();
+    // A failed order is never confirmed, so there's nothing to notify -
+    // this is what stops a customer whose booking failed after Duffel
+    // rejected the order from getting a "you're booked" message.
+    expect(mockSendBookingConfirmations).not.toHaveBeenCalled();
+  });
+
+  it("sends the booking confirmation once the Duffel order actually succeeds - not from the Stripe webhook, which can't tell a real order happened", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
+    mockGetOfferWithServices.mockResolvedValueOnce(makeOffer());
+    mockDuffelRequest.mockResolvedValueOnce({ id: "ord_001", booking_reference: "DUF123" });
+
+    await POST(makeRequest(baseBody()));
+
+    expect(mockSendBookingConfirmations).toHaveBeenCalledTimes(1);
+    expect(mockSendBookingConfirmations).toHaveBeenCalledWith(
+      expect.objectContaining({ id: PENDING_BOOKING_ID, status: "confirmed" })
+    );
+  });
+
+  it("does not let a notification failure fail the booking request itself", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
+    mockGetOfferWithServices.mockResolvedValueOnce(makeOffer());
+    mockDuffelRequest.mockResolvedValueOnce({ id: "ord_001", booking_reference: "DUF123" });
+    mockSendBookingConfirmations.mockRejectedValueOnce(new Error("email provider down"));
+
+    const res = await POST(makeRequest(baseBody()));
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.booking.status).toBe("confirmed");
   });
 
   it("returns the existing confirmed booking instead of creating a duplicate when the payment intent was already fully processed (idempotency)", async () => {

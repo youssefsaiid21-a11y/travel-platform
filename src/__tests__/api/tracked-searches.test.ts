@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import type { SearchParams } from "@/lib/parser/types";
 
 const mockAuth = vi.hoisted(() => vi.fn());
@@ -86,6 +87,25 @@ describe("POST /api/tracked-searches", () => {
       }),
     });
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 (not 500) when the session's userId no longer exists in the DB", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: MOCK_USER_ID } });
+    mockFindFirst.mockResolvedValueOnce(null);
+    mockCreate.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Foreign key constraint failed", {
+        code: "P2003",
+        clientVersion: "test",
+      })
+    );
+
+    const res = await POST(
+      makePostRequest({ searchParams: SEARCH_PARAMS, cheapestAmount: "200.00", cheapestCurrency: "GBP" })
+    );
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/sign in again/i);
   });
 
   it("updates the existing row instead of creating a duplicate", async () => {

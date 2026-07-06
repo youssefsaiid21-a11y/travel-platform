@@ -14,12 +14,12 @@ export async function GET(
   const { id } = await params;
   const booking = await db.booking.findUnique({ where: { id } });
 
-  if (!booking) {
+  // Same response for "doesn't exist" and "exists but isn't yours" - matches
+  // the page route's own documented intent (booking/[id]/page.tsx) that
+  // someone probing another user's booking id shouldn't be able to tell
+  // the two cases apart.
+  if (!booking || booking.userId !== session.user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  if (booking.userId !== session.user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   return NextResponse.json({ booking });

@@ -62,11 +62,11 @@ describe("GET /api/booking/[id]", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns 403 when booking belongs to a different user", async () => {
+  it("returns 404 (not 403) when booking belongs to a different user, indistinguishable from not existing", async () => {
     mockAuth.mockResolvedValueOnce({ user: { id: OTHER_USER_ID } });
     mockFindUnique.mockResolvedValueOnce(MOCK_BOOKING);
     const res = await GET(makeRequest(BOOKING_ID), makeParams(BOOKING_ID));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 
   it("returns the booking when owner requests it", async () => {

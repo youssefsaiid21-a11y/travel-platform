@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import type { SearchParams } from "@/lib/parser/types";
+
+// Sessions are JWTs (src/auth.ts) - userId comes straight from a signed
+// cookie and is never re-checked against the User table on each request.
+// If that user's row no longer exists (deleted account, or - locally - a
+// reseeded dev DB under an old cookie) this insert hits the userId foreign
+// key and Postgres rejects it, which would otherwise surface as an opaque
+// 500 instead of "please log in again".
+function isMissingUserError(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003";
+}
 
 interface CreateTrackedSearchBody {
   searchParams: SearchParams;
@@ -70,9 +81,20 @@ export async function POST(req: NextRequest) {
     lastKnownCurrency: cheapestCurrency,
   };
 
-  const trackedSearch = existing
-    ? await db.trackedSearch.update({ where: { id: existing.id }, data })
-    : await db.trackedSearch.create({ data });
+  let trackedSearch;
+  try {
+    trackedSearch = existing
+      ? await db.trackedSearch.update({ where: { id: existing.id }, data })
+      : await db.trackedSearch.create({ data });
+  } catch (err) {
+    if (isMissingUserError(err)) {
+      return NextResponse.json(
+        { error: "Your session is out of date - please sign in again." },
+        { status: 401 }
+      );
+    }
+    throw err;
+  }
 
   return NextResponse.json({ trackedSearch }, { status: existing ? 200 : 201 });
 }

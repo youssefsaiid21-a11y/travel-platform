@@ -58,6 +58,25 @@ describe("POST /api/cron/check-price-drops", () => {
     expect(body).toEqual({ total: 3, checked: 3, dropped: 1, failed: 0 });
   });
 
+  it("checks every tracked search across multiple internal batches, not just the first batch", async () => {
+    // 25 rows against a batch size of 10 - exercises 3 chunked batches
+    // (10 + 10 + 5) rather than one unbounded fan-out.
+    const rows = Array.from({ length: 25 }, (_, i) => ({ id: `trk_${i}` }));
+    mockFindMany.mockResolvedValueOnce(rows);
+    mockCheckTrackedSearchForPriceDrop.mockImplementation(async ({ id }: { id: string }) => ({
+      trackedSearchId: id,
+      checked: true,
+      dropped: false,
+    }));
+
+    const res = await POST(makeRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ total: 25, checked: 25, dropped: 0, failed: 0 });
+    expect(mockCheckTrackedSearchForPriceDrop).toHaveBeenCalledTimes(25);
+  });
+
   it("does not let one failing check take down the whole batch", async () => {
     mockFindMany.mockResolvedValueOnce([{ id: "trk_1" }, { id: "trk_2" }]);
     mockCheckTrackedSearchForPriceDrop

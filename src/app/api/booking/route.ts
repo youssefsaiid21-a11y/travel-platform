@@ -8,6 +8,7 @@ import type { SearchParams } from "@/lib/parser/types";
 import { getStripe } from "@/lib/stripe";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { passengerValidationError } from "@/lib/passengerValidation";
+import { sendBookingConfirmations } from "@/lib/notifications";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
@@ -255,7 +256,27 @@ export async function POST(req: NextRequest) {
       totalCurrency: offer.total_currency,
       offerSnapshot: JSON.stringify(offer),
     },
+    include: {
+      user: {
+        select: { email: true, passengerProfile: { select: { phone: true } } },
+      },
+    },
   });
+
+  // This is the only place a booking is ever definitively confirmed (after
+  // a real Duffel order succeeds), so it's the only place that should send
+  // the confirmation - the Stripe webhook used to do this independently
+  // based on payment success alone, which raced against this request (the
+  // webhook usually arrives before this fetch call even completes) and
+  // could flip status to "confirmed" before a Duffel order existed. Firing
+  // from here is also naturally idempotent: a retried request for the same
+  // payment short-circuits through the unique-constraint branch above and
+  // never reaches this line, so it can't double-send.
+  if (status === "confirmed") {
+    sendBookingConfirmations(finalBooking).catch((err) =>
+      console.error("Failed to send booking confirmations:", err)
+    );
+  }
 
   return NextResponse.json({ booking: finalBooking }, { status: 201 });
 }

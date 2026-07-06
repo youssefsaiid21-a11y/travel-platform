@@ -138,6 +138,26 @@ export async function checkTrackedSearchForPriceDrop(
     cheapest.total_currency
   );
 
+  // Always refresh the baseline to today's cheapest fare (not only on a
+  // drop) so the next check compares against reality instead of a stale
+  // price - otherwise a price that rises then dips again would never
+  // re-trigger an alert once it crossed the original baseline once.
+  //
+  // Persisted before sending the alert (not after): sendPriceDropAlert
+  // swallows its own per-channel failures internally (Promise.allSettled)
+  // and never throws, so the only realistic failure point in this
+  // sequence is this update. Doing it first means a failed update simply
+  // skips this round's alert and retries both together next run, instead
+  // of the alert having already gone out with the stale baseline never
+  // advancing - which would re-send an identical alert next time.
+  await db.trackedSearch.update({
+    where: { id: tracked.id },
+    data: {
+      lastKnownPrice: cheapest.total_amount,
+      lastKnownCurrency: cheapest.total_currency,
+    },
+  });
+
   if (comparison.dropped) {
     await sendPriceDropAlert({
       trackedSearchId: tracked.id,
@@ -154,18 +174,6 @@ export async function checkTrackedSearchForPriceDrop(
       appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "https://orbi.travel",
     });
   }
-
-  // Always refresh the baseline to today's cheapest fare (not only on a
-  // drop) so the next check compares against reality instead of a stale
-  // price - otherwise a price that rises then dips again would never
-  // re-trigger an alert once it crossed the original baseline once.
-  await db.trackedSearch.update({
-    where: { id: tracked.id },
-    data: {
-      lastKnownPrice: cheapest.total_amount,
-      lastKnownCurrency: cheapest.total_currency,
-    },
-  });
 
   return {
     trackedSearchId: tracked.id,

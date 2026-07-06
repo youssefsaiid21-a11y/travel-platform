@@ -57,9 +57,21 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  const results = await Promise.allSettled(
-    dueSearches.map((tracked) => checkTrackedSearchForPriceDrop(tracked))
-  );
+  // Each check is one live Duffel search - firing all of them at once would
+  // scale with the size of the table, not with what Duffel or this
+  // function's own execution-time budget can actually sustain. Chunking
+  // keeps at most BATCH_SIZE in flight at a time; batches still run
+  // sequentially, but each one is cheap and bounded regardless of how many
+  // tracked searches exist.
+  const BATCH_SIZE = 10;
+  const results: PromiseSettledResult<Awaited<ReturnType<typeof checkTrackedSearchForPriceDrop>>>[] = [];
+  for (let i = 0; i < dueSearches.length; i += BATCH_SIZE) {
+    const batch = dueSearches.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.allSettled(
+      batch.map((tracked) => checkTrackedSearchForPriceDrop(tracked))
+    );
+    results.push(...batchResults);
+  }
 
   const checked = results.filter((r) => r.status === "fulfilled").length;
   const dropped = results.filter(
