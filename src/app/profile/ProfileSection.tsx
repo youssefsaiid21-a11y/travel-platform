@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getCountryOptions } from "@/lib/countries";
+import { PassportIcon } from "@/components/icons";
 import styles from "./page.module.css";
 
 interface PassengerProfile {
@@ -12,6 +14,9 @@ interface PassengerProfile {
   title: string;
   phone: string;
   specialRequests: string | null;
+  nationality: string | null;
+  passportNumber: string | null;
+  passportExpiry: string | null;
   updatedAt: string;
 }
 
@@ -27,6 +32,8 @@ export function ProfileSection({ profile }: { profile: PassengerProfile | null }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const countryOptions = getCountryOptions();
+
   const [form, setForm] = useState({
     title: profile?.title ?? "mr",
     gender: profile?.gender ?? "m",
@@ -35,6 +42,9 @@ export function ProfileSection({ profile }: { profile: PassengerProfile | null }
     bornOn: profile?.bornOn ?? "",
     phone: profile?.phone ?? "",
     specialRequests: profile?.specialRequests ?? "",
+    nationality: profile?.nationality ?? "",
+    passportNumber: profile?.passportNumber ?? "",
+    passportExpiry: profile?.passportExpiry ?? "",
   });
 
   function startEdit() {
@@ -46,6 +56,9 @@ export function ProfileSection({ profile }: { profile: PassengerProfile | null }
       bornOn: profile?.bornOn ?? "",
       phone: profile?.phone ?? "",
       specialRequests: profile?.specialRequests ?? "",
+      nationality: profile?.nationality ?? "",
+      passportNumber: profile?.passportNumber ?? "",
+      passportExpiry: profile?.passportExpiry ?? "",
     });
     setError("");
     setEditing(true);
@@ -69,6 +82,9 @@ export function ProfileSection({ profile }: { profile: PassengerProfile | null }
         title: form.title,
         phone: form.phone.trim(),
         specialRequests: form.specialRequests.trim() || null,
+        nationality: form.nationality || null,
+        passportNumber: form.passportNumber.trim() || null,
+        passportExpiry: form.passportExpiry || null,
       }),
     });
     setSaving(false);
@@ -141,6 +157,33 @@ export function ProfileSection({ profile }: { profile: PassengerProfile | null }
               value={form.phone} required
               onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
           </label>
+          <label className={styles.formLabel}>
+            Nationality
+            {countryOptions.length > 0 ? (
+              <select className={styles.formSelect} value={form.nationality}
+                onChange={(e) => setForm((f) => ({ ...f, nationality: e.target.value }))}>
+                <option value="">Select country</option>
+                {countryOptions.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+              </select>
+            ) : (
+              <input className={styles.formInput} value={form.nationality}
+                placeholder="ISO country code, e.g. GB"
+                onChange={(e) => setForm((f) => ({ ...f, nationality: e.target.value.toUpperCase() }))} />
+            )}
+          </label>
+          <label className={styles.formLabel}>
+            <span className={styles.formLabelText}>
+              <PassportIcon className={styles.formLabelIcon} />
+              Passport number
+            </span>
+            <input className={styles.formInput} value={form.passportNumber}
+              onChange={(e) => setForm((f) => ({ ...f, passportNumber: e.target.value }))} />
+          </label>
+          <label className={styles.formLabel}>
+            Passport expiry
+            <input type="date" className={styles.formInput} value={form.passportExpiry}
+              onChange={(e) => setForm((f) => ({ ...f, passportExpiry: e.target.value }))} />
+          </label>
         </div>
         <label className={`${styles.formLabel} ${styles.formLabelFull}`}>
           Special requests
@@ -185,6 +228,18 @@ export function ProfileSection({ profile }: { profile: PassengerProfile | null }
         <div className={styles.field}>
           <span className={styles.fieldLabel}>Phone</span>
           <span className={styles.fieldValue}>{profile!.phone}</span>
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>Nationality</span>
+          <span className={styles.fieldValue}>{profile!.nationality ?? "Not set"}</span>
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>Passport</span>
+          <span className={styles.fieldValue}>
+            {profile!.passportNumber
+              ? `${profile!.passportNumber} · expires ${profile!.passportExpiry ? new Date(profile!.passportExpiry).toLocaleDateString("en-GB", { dateStyle: "medium" }) : "unknown"}`
+              : "Not set"}
+          </span>
         </div>
         {profile!.specialRequests && (
           <div className={`${styles.field} ${styles.fieldFull}`}>

@@ -1,0 +1,84 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.75rem 0 1.25rem;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.dot svg {
+  width: 12px;
+  height: 12px;
+}
+
+.done {
+  background: var(--gradient-accent);
+  color: #fff;
+}
+
+.active {
+  background: var(--surface-solid);
+  border: 2px solid var(--accent);
+  color: var(--accent);
+}
+
+.upcoming {
+  background: rgba(2, 132, 199, 0.08);
+  color: var(--text-3);
+}
+
+.label {
+  font-size: 0.75rem;
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+.labelActive {
+  font-size: 0.75rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.connector {
+  width: 24px;
+  height: 2px;
+  background: rgba(2, 132, 199, 0.15);
+  border-radius: 1px;
+}
+
+.connectorDone {
+  background: var(--gradient-accent);
+}
+
+@media (max-width: 480px) {
+  .wrap {
+    gap: 0.2rem;
+  }
+
+  .connector {
+    width: 14px;
+  }
+
+  .label,
+  .labelActive {
+    display: none;
+  }
+}

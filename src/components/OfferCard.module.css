@@ -206,6 +206,17 @@
   z-index: 1;
 }
 
+/* Small plane that glides across the (already-accurate) straight track
+   line - purely decorative, so it uses a plain left-% keyframe instead of
+   offset-path: percentages stay correct at any card width, unlike a fixed
+   coordinate path. Sits above .stopDot (z-index: 1) so it stays visible
+   passing over stop markers on multi-stop itineraries instead of gliding
+   behind them. */
+.planeGlider {
+  composes: plane-glide from global;
+  z-index: 2;
+}
+
 .stops {
   font-size: 0.68rem;
   color: var(--text-3);
@@ -512,6 +523,11 @@
   border-radius: var(--r-sm);
 }
 
+.skeletonTrackWrap {
+  position: relative;
+  width: 100%;
+}
+
 .skeletonTrack {
   composes: skeletonLine;
   height: 2px;
@@ -524,6 +540,22 @@
   padding: 0.35rem 1rem 0;
   font-size: 0.72rem;
   color: var(--text-3);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.rowIcon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.btnIcon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
 }
 
 .bagSeatOptions {

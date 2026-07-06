@@ -7,6 +7,8 @@ import { OfferList } from "@/components/OfferList";
 import { OfferCardSkeleton } from "@/components/OfferCard";
 import { PriceCalendarSection } from "@/components/PriceCalendarSection";
 import { ExploreResults } from "@/components/ExploreResults";
+import { OrbiWordmark, OrbiMark } from "@/components/OrbiLogo";
+import { FlightPath } from "@/components/FlightPath";
 import type { ChatResponse } from "@/app/api/chat/route";
 import type { NormalizedOffer } from "@/lib/duffel/types";
 import type { PriceCalendarEntry } from "@/lib/duffel/search";
@@ -331,7 +333,7 @@ export default function Home() {
       <main className={styles.messages} aria-label="Flight search results" aria-live="off" aria-busy={loading}>
         {!hasSearched && (
           <div className={styles.hero}>
-            <div className={styles.heroLogo}>Orbi</div>
+            <div className={styles.heroLogo}><OrbiWordmark /></div>
             <p className={styles.heroTagline}>Search real flights with plain English</p>
             <p className={styles.heroSub}>
               Save your details once - book any flight in under a minute, for life.
@@ -413,7 +415,9 @@ export default function Home() {
           return (
             <div key={i} className={styles.assistantRow}>
               <div className={styles.assistantHeader}>
-                <div className={styles.assistantAvatar}>O</div>
+                <div className={styles.assistantAvatar}>
+                  <OrbiMark tone="mono" className={styles.assistantAvatarMark} />
+                </div>
                 <span className={styles.assistantLabel}>Orbi</span>
               </div>
               <div className={styles.assistantBubble}>
@@ -437,6 +441,18 @@ export default function Home() {
               )}
               {msg.offers && msg.offers.length > 0 && (
                 <div className={styles.offers}>
+                  {isLastAssistant &&
+                    msg.searchParams?.origin &&
+                    msg.searchParams?.destination &&
+                    !msg.searchParams?.additional_slices?.length && (
+                    <div className={styles.routeStrip}>
+                      <FlightPath
+                        compact
+                        origin={msg.searchParams.origin}
+                        destination={msg.searchParams.destination}
+                      />
+                    </div>
+                  )}
                   {isLastAssistant && msg.priceCalendar && msg.priceCalendar.length > 1 && msg.searchParams && (
                     <PriceCalendarSection
                       entries={msg.priceCalendar}
@@ -505,7 +521,9 @@ export default function Home() {
         {loading && (
           <div className={styles.assistantRow}>
             <div className={styles.assistantHeader}>
-              <div className={styles.assistantAvatar}>O</div>
+              <div className={styles.assistantAvatar}>
+                <OrbiMark tone="mono" className={styles.assistantAvatarMark} />
+              </div>
               <span className={styles.assistantLabel}>Orbi</span>
             </div>
             {streamingReply ? (
@@ -526,6 +544,9 @@ export default function Home() {
             )}
             {(statusStep === "searching" || statusStep === "ranking") && (
               <div className={styles.offers}>
+                <div className={styles.routeStrip}>
+                  <FlightPath compact />
+                </div>
                 <OfferCardSkeleton />
                 <OfferCardSkeleton />
                 <OfferCardSkeleton />

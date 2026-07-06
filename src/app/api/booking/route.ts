@@ -7,6 +7,7 @@ import { getOfferWithServices } from "@/lib/duffel/search";
 import type { SearchParams } from "@/lib/parser/types";
 import { getStripe } from "@/lib/stripe";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { passengerValidationError } from "@/lib/passengerValidation";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
@@ -21,6 +22,11 @@ export interface BookingPassenger {
   title: "mr" | "ms" | "mrs" | "dr" | "miss";
   email: string;
   phone_number: string;
+  // Required for Duffel/the airline to accept an international order -
+  // ISO 3166-1 alpha-2 country codes (e.g. "GB").
+  nationality: string;
+  passport_number: string;
+  passport_expiry: string;
 }
 
 interface CreateBookingBody {
@@ -49,6 +55,15 @@ export async function POST(req: NextRequest) {
 
   const body = (await req.json()) as CreateBookingBody;
   const { offerId, searchParams, passengers, stripePaymentIntentId, specialRequests } = body;
+
+  // Fail fast on malformed/incomplete passenger data before claiming a
+  // booking row or touching Stripe/Duffel - passport/nationality are not
+  // optional, the order will be rejected without them.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  for (const p of passengers) {
+    const err = passengerValidationError(p, todayStr);
+    if (err) return NextResponse.json({ error: err }, { status: 400 });
+  }
 
   // Verify payment succeeded before touching Duffel (CLAUDE.md guardrail #2)
   const pi = await getStripe().paymentIntents.retrieve(stripePaymentIntentId);
@@ -200,6 +215,18 @@ export async function POST(req: NextRequest) {
             title: p.title,
             email: p.email,
             phone_number: p.phone_number,
+            identity_documents: [
+              {
+                type: "passport",
+                // Trimmed defensively here (not just validated) so a
+                // whitespace-padded value - possible from a client bug, or
+                // any direct API caller bypassing the UI - never reaches
+                // the airline's passport-matching system.
+                unique_identifier: p.passport_number.trim(),
+                expires_on: p.passport_expiry,
+                issuing_country_code: p.nationality,
+              },
+            ],
           })),
           payments: [
             {

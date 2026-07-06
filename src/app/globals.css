@@ -166,6 +166,32 @@ body::before {
   animation: shimmer 1.4s ease-in-out infinite;
 }
 
+/* Plane that glides left-to-right across a straight duration line - shared
+   by OfferCard's real/skeleton track and the booking-confirm flight
+   summary so the timing/positions can't drift apart between stylesheets. */
+@keyframes plane-glide {
+  0% { left: 4%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { left: 96%; opacity: 0; }
+}
+
+.plane-glide {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  color: var(--warn);
+  animation: plane-glide 3.2s ease-in-out infinite;
+}
+
+.plane-glide svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
 a {
   color: inherit;
   text-decoration: none;

@@ -120,12 +120,21 @@
   color: var(--text-2);
 }
 
+.flightTrack {
+  position: relative;
+  width: 100%;
+}
+
 .flightLine {
   width: 100%;
   height: 2px;
   background: linear-gradient(90deg, var(--accent-light), var(--accent));
   border-radius: 1px;
   opacity: 0.4;
+}
+
+.planeGlider {
+  composes: plane-glide from global;
 }
 
 .flightStops {
@@ -256,6 +265,18 @@
 
 .fullWidth {
   grid-column: 1 / -1;
+}
+
+.labelText {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.labelIcon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
 }
 
 .label {

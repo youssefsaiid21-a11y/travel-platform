@@ -32,16 +32,31 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { givenName, familyName, bornOn, gender, title, phone, specialRequests } = body;
+  const {
+    givenName, familyName, bornOn, gender, title, phone, specialRequests,
+    nationality, passportNumber, passportExpiry,
+  } = body;
 
   if (!givenName || !familyName || !bornOn || !gender || !title || !phone) {
     return NextResponse.json({ error: "All fields required" }, { status: 400 });
   }
 
+  // Passport/nationality are nullable at this layer (a profile saved before
+  // this field existed, or before the user has entered them, is still a
+  // valid partial save) - the booking flow itself enforces they're present
+  // before an order can actually be placed.
+  const data = {
+    givenName, familyName, bornOn, gender, title, phone,
+    specialRequests: specialRequests ?? null,
+    nationality: nationality ?? null,
+    passportNumber: passportNumber ?? null,
+    passportExpiry: passportExpiry ?? null,
+  };
+
   const profile = await db.passengerProfile.upsert({
     where: { userId: session.user.id },
-    update: { givenName, familyName, bornOn, gender, title, phone, specialRequests: specialRequests ?? null },
-    create: { userId: session.user.id, givenName, familyName, bornOn, gender, title, phone, specialRequests: specialRequests ?? null },
+    update: data,
+    create: { userId: session.user.id, ...data },
   });
 
   return NextResponse.json(profile);

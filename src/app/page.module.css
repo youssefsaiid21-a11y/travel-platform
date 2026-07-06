@@ -260,6 +260,11 @@
   box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
 }
 
+.assistantAvatarMark {
+  width: 16px;
+  height: 16px;
+}
+
 .assistantHeader {
   display: flex;
   align-items: center;
@@ -293,6 +298,12 @@
 
 .offers {
   width: 100%;
+}
+
+.routeStrip {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.75rem;
 }
 
 .trackPriceRow {

@@ -180,6 +180,18 @@
   gap: 0.75rem 1rem;
 }
 
+.formLabelText {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.formLabelIcon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
 .formLabel {
   display: flex;
   flex-direction: column;

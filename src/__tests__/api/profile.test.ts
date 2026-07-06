@@ -127,4 +127,41 @@ describe("POST /api/profile/passenger", () => {
     const res = await POST(makeRequest("POST", { givenName: "Jane" }));
     expect(res.status).toBe(400);
   });
+
+  it("saves passport/nationality fields when provided", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: MOCK_USER_ID } });
+    mockUpsert.mockResolvedValueOnce(MOCK_PROFILE);
+    const res = await POST(makeRequest("POST", {
+      ...VALID_BODY,
+      nationality: "GB",
+      passportNumber: "987654321",
+      passportExpiry: "2035-01-01",
+    }));
+    expect(res.status).toBe(200);
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          nationality: "GB",
+          passportNumber: "987654321",
+          passportExpiry: "2035-01-01",
+        }),
+      })
+    );
+  });
+
+  it("still saves the profile with null passport fields when they're omitted (partial save is allowed)", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: MOCK_USER_ID } });
+    mockUpsert.mockResolvedValueOnce(MOCK_PROFILE);
+    const res = await POST(makeRequest("POST", VALID_BODY));
+    expect(res.status).toBe(200);
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          nationality: null,
+          passportNumber: null,
+          passportExpiry: null,
+        }),
+      })
+    );
+  });
 });

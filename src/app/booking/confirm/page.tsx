@@ -7,6 +7,10 @@ import dynamic from "next/dynamic";
 import type { NormalizedOffer } from "@/lib/duffel/types";
 import type { SearchParams } from "@/lib/parser/types";
 import type { BookingPassenger } from "@/app/api/booking/route";
+import { passengerValidationError } from "@/lib/passengerValidation";
+import { getCountryOptions } from "@/lib/countries";
+import { BookingSteps } from "@/components/BookingSteps";
+import { PlaneIcon, PassportIcon } from "@/components/icons";
 import styles from "./page.module.css";
 
 const StripeCheckout = dynamic(() => import("@/components/StripeCheckout"), {
@@ -27,6 +31,9 @@ interface PassengerProfile {
   title: string;
   phone: string;
   specialRequests: string | null;
+  nationality: string | null;
+  passportNumber: string | null;
+  passportExpiry: string | null;
 }
 
 const TITLES = ["mr", "ms", "mrs", "dr", "miss"] as const;
@@ -115,6 +122,9 @@ export default function ConfirmPage() {
   const [profile, setProfile] = useState<PassengerProfile | null | undefined>(undefined); // undefined = loading
   const [editMode, setEditMode] = useState(false);
   const [saveProfile, setSaveProfile] = useState(true);
+  // Lazy initializer runs once on mount, not on every render - safe under
+  // the render-purity rule, unlike calling Date.now() directly in render.
+  const [todayStr] = useState(() => new Date().toISOString().slice(0, 10));
 
   // Form state for passenger 1 (account holder)
   const [form, setForm] = useState({
@@ -124,7 +134,14 @@ export default function ConfirmPage() {
     gender: "m" as "m" | "f",
     title: "mr" as BookingPassenger["title"],
     phone_number: "",
+    nationality: "",
+    passport_number: "",
+    passport_expiry: "",
   });
+
+  // getCountryOptions() caches its result after the first call, so this is
+  // effectively free on re-renders without needing its own memo hook.
+  const countryOptions = getCountryOptions();
 
   // Extra passengers (indices 1+) for multi-pax bookings
   const [extraPassengers, setExtraPassengers] = useState<BookingPassenger[]>([]);
@@ -160,6 +177,9 @@ export default function ConfirmPage() {
           title: "mr" as BookingPassenger["title"],
           email: session?.user?.email ?? "",
           phone_number: "",
+          nationality: "",
+          passport_number: "",
+          passport_expiry: "",
         }))
       );
     }
@@ -181,8 +201,32 @@ export default function ConfirmPage() {
             gender: p.gender as "m" | "f",
             title: p.title as BookingPassenger["title"],
             phone_number: p.phone,
+            nationality: p.nationality ?? "",
+            passport_number: p.passportNumber ?? "",
+            passport_expiry: p.passportExpiry ?? "",
           });
           setSpecialRequests(p.specialRequests ?? "");
+          // A profile saved before travel-document fields existed, never
+          // filled in, or whose passport has since expired can't skip
+          // straight to quick-book - the order will be rejected without
+          // valid documents. Uses the same check as primaryIsValid() below
+          // so this can't drift out of sync with what's actually required
+          // to book (it previously only checked presence, not expiry).
+          const profileDocsError = passengerValidationError(
+            {
+              given_name: p.givenName,
+              family_name: p.familyName,
+              born_on: p.bornOn,
+              phone_number: p.phone,
+              nationality: p.nationality ?? "",
+              passport_number: p.passportNumber ?? "",
+              passport_expiry: p.passportExpiry ?? "",
+            },
+            todayStr
+          );
+          if (profileDocsError) {
+            setEditMode(true);
+          }
         } else {
           // No profile yet - go straight to form
           setEditMode(true);
@@ -192,6 +236,7 @@ export default function ConfirmPage() {
         setProfile(null);
         setEditMode(true);
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- todayStr never changes after mount (no setter is ever called), safe to omit
   }, []);
 
   const updateExtra = useCallback(
@@ -216,28 +261,25 @@ export default function ConfirmPage() {
       title: form.title,
       email,
       phone_number: form.phone_number,
+      nationality: form.nationality,
+      passport_number: form.passport_number.trim(),
+      passport_expiry: form.passport_expiry,
     };
 
     return [primary, ...extraPassengers.map((ep, i) => ({
       ...ep,
       id: pending.offer.passengers[i + 1].id,
       email: ep.email || email,
+      passport_number: ep.passport_number.trim(),
     }))];
   }
 
   function primaryIsValid() {
-    return (
-      form.given_name.trim() &&
-      form.family_name.trim() &&
-      form.born_on &&
-      form.phone_number.trim()
-    );
+    return !passengerValidationError(form, todayStr);
   }
 
   function extrasAreValid() {
-    return extraPassengers.every(
-      (p) => p.given_name.trim() && p.family_name.trim() && p.born_on && p.phone_number.trim()
-    );
+    return extraPassengers.every((p) => !passengerValidationError(p, todayStr));
   }
 
   async function handleProceed() {
@@ -258,6 +300,9 @@ export default function ConfirmPage() {
           title: form.title,
           phone: form.phone_number,
           specialRequests: specialRequests || null,
+          nationality: form.nationality || null,
+          passportNumber: form.passport_number.trim() || null,
+          passportExpiry: form.passport_expiry || null,
         }),
       });
     }
@@ -307,6 +352,8 @@ export default function ConfirmPage() {
   return (
     <div className={styles.page}>
       <div className={styles.container}>
+
+        <BookingSteps current={step} />
 
         {/* ── Offer expiry bar ───────────────────────── */}
         {expiry.expired ? (
@@ -359,7 +406,12 @@ export default function ConfirmPage() {
                 </div>
                 <div className={styles.flightMiddle}>
                   <span className={styles.flightDur}>{formatDuration(slice.duration)}</span>
-                  <div className={styles.flightLine} />
+                  <div className={styles.flightTrack}>
+                    <div className={styles.flightLine} />
+                    <div className={styles.planeGlider}>
+                      <PlaneIcon />
+                    </div>
+                  </div>
                   <span className={styles.flightStops}>
                     {slice.stops === 0 ? "Non-stop" : `${slice.stops} stop${slice.stops > 1 ? "s" : ""}`}
                   </span>
@@ -416,6 +468,10 @@ export default function ConfirmPage() {
                     </p>
                     <p className={styles.profileMeta}>
                       {session?.user?.email} · {profile.phone}
+                    </p>
+                    <p className={styles.profileMeta}>
+                      Passport {profile.passportNumber} ({profile.nationality}) · expires{" "}
+                      {profile.passportExpiry && new Date(profile.passportExpiry).toLocaleDateString("en-GB", { dateStyle: "medium" })}
                     </p>
                   </div>
                   <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
@@ -483,6 +539,37 @@ export default function ConfirmPage() {
                       value={form.phone_number} required
                       onChange={(e) => setForm((f) => ({ ...f, phone_number: e.target.value }))} />
                   </label>
+
+                  <label className={styles.label}>
+                    Nationality
+                    {countryOptions.length > 0 ? (
+                      <select className={styles.select} value={form.nationality} required
+                        onChange={(e) => setForm((f) => ({ ...f, nationality: e.target.value }))}>
+                        <option value="" disabled>Select country</option>
+                        {countryOptions.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+                      </select>
+                    ) : (
+                      <input className={styles.input} value={form.nationality} required
+                        placeholder="ISO country code, e.g. GB"
+                        onChange={(e) => setForm((f) => ({ ...f, nationality: e.target.value.toUpperCase() }))} />
+                    )}
+                  </label>
+
+                  <label className={styles.label}>
+                    <span className={styles.labelText}>
+                      <PassportIcon className={styles.labelIcon} />
+                      Passport number
+                    </span>
+                    <input className={styles.input} value={form.passport_number} required
+                      onChange={(e) => setForm((f) => ({ ...f, passport_number: e.target.value }))} />
+                  </label>
+
+                  <label className={styles.label}>
+                    Passport expiry
+                    <input type="date" className={styles.input} value={form.passport_expiry} required
+                      min={todayStr}
+                      onChange={(e) => setForm((f) => ({ ...f, passport_expiry: e.target.value }))} />
+                  </label>
                 </div>
 
                 <label className={styles.saveCheck}>
@@ -537,6 +624,34 @@ export default function ConfirmPage() {
                     Phone
                     <input type="tel" className={styles.input} value={ep.phone_number} required
                       onChange={(e) => updateExtra(i, "phone_number", e.target.value)} />
+                  </label>
+                  <label className={styles.label}>
+                    Nationality
+                    {countryOptions.length > 0 ? (
+                      <select className={styles.select} value={ep.nationality} required
+                        onChange={(e) => updateExtra(i, "nationality", e.target.value)}>
+                        <option value="" disabled>Select country</option>
+                        {countryOptions.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+                      </select>
+                    ) : (
+                      <input className={styles.input} value={ep.nationality} required
+                        placeholder="ISO country code, e.g. GB"
+                        onChange={(e) => updateExtra(i, "nationality", e.target.value.toUpperCase())} />
+                    )}
+                  </label>
+                  <label className={styles.label}>
+                    <span className={styles.labelText}>
+                      <PassportIcon className={styles.labelIcon} />
+                      Passport number
+                    </span>
+                    <input className={styles.input} value={ep.passport_number} required
+                      onChange={(e) => updateExtra(i, "passport_number", e.target.value)} />
+                  </label>
+                  <label className={styles.label}>
+                    Passport expiry
+                    <input type="date" className={styles.input} value={ep.passport_expiry} required
+                      min={todayStr}
+                      onChange={(e) => updateExtra(i, "passport_expiry", e.target.value)} />
                   </label>
                 </div>
               </section>

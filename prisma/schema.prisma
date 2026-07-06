@@ -28,6 +28,14 @@ model PassengerProfile {
   title           String
   phone           String
   specialRequests String?
+  // Nullable: required to actually book a flight (Duffel/the airline
+  // rejects international orders without them), but profiles saved before
+  // this field existed won't have it yet - the booking flow treats a
+  // profile missing any of these as incomplete and falls back to the form
+  // instead of quick-book.
+  nationality     String?
+  passportNumber  String?
+  passportExpiry  String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   user            User     @relation(fields: [userId], references: [id])

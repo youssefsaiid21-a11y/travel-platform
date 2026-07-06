@@ -94,6 +94,9 @@ const PASSENGER = {
   title: "ms" as const,
   email: "jane@example.com",
   phone_number: "+15555550100",
+  nationality: "GB",
+  passport_number: "123456789",
+  passport_expiry: "2035-01-01",
 };
 
 function makeRequest(body: object) {
@@ -302,6 +305,106 @@ describe("POST /api/booking", () => {
         }),
       })
     );
+  });
+
+  it("sends the passenger's passport as an identity_documents entry on the Duffel order", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
+    mockGetOfferWithServices.mockResolvedValueOnce(makeOffer());
+    mockDuffelRequest.mockResolvedValueOnce({ id: "ord_001", booking_reference: "DUF123" });
+
+    await POST(makeRequest(baseBody()));
+
+    expect(mockDuffelRequest).toHaveBeenCalledWith(
+      "/air/orders",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          data: expect.objectContaining({
+            passengers: [
+              expect.objectContaining({
+                identity_documents: [
+                  {
+                    type: "passport",
+                    unique_identifier: "123456789",
+                    expires_on: "2035-01-01",
+                    issuing_country_code: "GB",
+                  },
+                ],
+              }),
+            ],
+          }),
+        }),
+      })
+    );
+  });
+
+  it("trims whitespace from the passport number before sending it to Duffel", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
+    mockGetOfferWithServices.mockResolvedValueOnce(makeOffer());
+    mockDuffelRequest.mockResolvedValueOnce({ id: "ord_001", booking_reference: "DUF123" });
+
+    await POST(makeRequest(baseBody({
+      passengers: [{ ...PASSENGER, passport_number: "  123456789  " }],
+    })));
+
+    expect(mockDuffelRequest).toHaveBeenCalledWith(
+      "/air/orders",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          data: expect.objectContaining({
+            passengers: [
+              expect.objectContaining({
+                identity_documents: [
+                  expect.objectContaining({ unique_identifier: "123456789" }),
+                ],
+              }),
+            ],
+          }),
+        }),
+      })
+    );
+  });
+
+  it("rejects the booking before touching Stripe or Duffel when a passenger is missing passport info", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    const noDocs = {
+      id: PASSENGER.id,
+      given_name: PASSENGER.given_name,
+      family_name: PASSENGER.family_name,
+      born_on: PASSENGER.born_on,
+      gender: PASSENGER.gender,
+      title: PASSENGER.title,
+      email: PASSENGER.email,
+      phone_number: PASSENGER.phone_number,
+    };
+
+    const res = await POST(makeRequest(baseBody({ passengers: [noDocs] })));
+
+    expect(res.status).toBe(400);
+    expect(mockPaymentIntentsRetrieve).not.toHaveBeenCalled();
+    expect(mockBookingCreate).not.toHaveBeenCalled();
+    expect(mockDuffelRequest).not.toHaveBeenCalled();
+  });
+
+  it("rejects the booking when the passenger's passport is already expired", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    const res = await POST(
+      makeRequest(baseBody({ passengers: [{ ...PASSENGER, passport_expiry: "2020-01-01" }] }))
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockBookingCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects the booking when nationality isn't a valid country code", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    const res = await POST(
+      makeRequest(baseBody({ passengers: [{ ...PASSENGER, nationality: "United Kingdom" }] }))
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockBookingCreate).not.toHaveBeenCalled();
   });
 
   it("still records a failed booking when Duffel order creation fails, without erroring the request", async () => {

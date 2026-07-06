@@ -1,0 +1,42 @@
+.logotype {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.mark {
+  width: 0.74em;
+  height: 0.74em;
+  vertical-align: -0.09em;
+  margin-right: 0.02em;
+  flex-shrink: 0;
+}
+
+.ringA,
+.ringB {
+  fill: none;
+  stroke-width: 2.9;
+}
+
+.ringA {
+  stroke: var(--accent);
+}
+
+.ringB {
+  stroke: var(--accent-light);
+}
+
+.dot {
+  fill: var(--warn);
+}
+
+.ringMono {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.9;
+  opacity: 0.9;
+}
+
+.dotMono {
+  fill: currentColor;
+}

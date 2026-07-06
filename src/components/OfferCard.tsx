@@ -8,6 +8,7 @@ import type {
   NormalizedService,
 } from "@/lib/duffel/types";
 import { layoverMinutes, formatLayover } from "@/lib/duffel/layover";
+import { BagIcon, SeatIcon, PlaneIcon } from "./icons";
 import styles from "./OfferCard.module.css";
 
 export type OfferTag = "cheapest" | "fastest" | "best";
@@ -139,6 +140,7 @@ function BagSeatOptions({ offerId }: { offerId: string }) {
         onClick={toggle}
         aria-expanded={expanded}
       >
+        <BagIcon className={styles.btnIcon} />
         {expanded ? "Hide" : "View"} bag & seat options
       </button>
       {expanded && (
@@ -291,6 +293,7 @@ function SeatMapPicker({ offerId }: { offerId: string }) {
         onClick={toggle}
         aria-expanded={expanded}
       >
+        <SeatIcon className={styles.btnIcon} />
         {expanded ? "Hide" : "View"} seat map
       </button>
       {expanded && (
@@ -399,6 +402,9 @@ function SliceRow({
           <span className={styles.duration}>{formatDuration(slice.duration)}</span>
           <div className={styles.track}>
             <div className={styles.trackLine} />
+            <div className={styles.planeGlider}>
+              <PlaneIcon />
+            </div>
             {slice.stops > 0 &&
               slice.segments.slice(0, -1).map((_, i) => (
                 <div
@@ -515,7 +521,12 @@ export function OfferCardSkeleton() {
         </div>
         <div className={styles.skeletonMiddle}>
           <div className={styles.skeletonDuration} />
-          <div className={styles.skeletonTrack} />
+          <div className={styles.skeletonTrackWrap}>
+            <div className={styles.skeletonTrack} />
+            <div className={styles.planeGlider}>
+              <PlaneIcon />
+            </div>
+          </div>
           <div className={styles.skeletonIata} />
         </div>
         <div className={styles.skeletonEndpoint}>
@@ -583,7 +594,10 @@ export function OfferCard({
       </div>
 
       {baggageSummary(offer) && (
-        <div className={styles.baggageRow}>{baggageSummary(offer)}</div>
+        <div className={styles.baggageRow}>
+          <BagIcon className={styles.rowIcon} />
+          {baggageSummary(offer)}
+        </div>
       )}
 
       <BagSeatOptions offerId={offer.id} />

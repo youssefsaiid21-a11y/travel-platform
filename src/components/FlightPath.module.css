@@ -1,0 +1,76 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.code {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+/* Fixed pixel size (not flex:1) so the plane's offset-path - which is not
+   relative to the container - stays lined up with the visible dashed arc. */
+.track {
+  position: relative;
+  width: 200px;
+  height: 50px;
+  flex-shrink: 0;
+}
+
+.track.compact {
+  width: 120px;
+  height: 34px;
+}
+
+.arc {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.dash {
+  fill: none;
+  stroke: var(--accent-light);
+  stroke-width: 2;
+  stroke-dasharray: 4 6;
+  stroke-linecap: round;
+}
+
+.endDot {
+  fill: var(--accent);
+}
+
+.plane {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--warn);
+  offset-path: path("M6 42 C 70 6, 130 6, 194 20");
+  offset-rotate: auto;
+  animation: fp-fly 3s linear infinite;
+}
+
+.planeCompact {
+  width: 12px;
+  height: 12px;
+  offset-path: path("M4 28 C 40 4, 80 4, 116 14");
+  animation-duration: 2.2s;
+}
+
+.plane svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+@keyframes fp-fly {
+  0% { offset-distance: 0%; opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}

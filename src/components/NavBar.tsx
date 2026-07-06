@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
+import { OrbiWordmark } from "./OrbiLogo";
 import styles from "./NavBar.module.css";
 
 export default function NavBar() {
@@ -12,8 +13,8 @@ export default function NavBar() {
 
   return (
     <nav className={styles.nav} aria-label="Main navigation">
-      <Link href="/" className={styles.brand}>
-        Orbi
+      <Link href="/" className={styles.brand} aria-label="Orbi">
+        <OrbiWordmark />
       </Link>
       <div className={styles.right}>
         {session?.user ? (
