@@ -378,6 +378,83 @@
   cursor: not-allowed;
 }
 
+/* ── Search checkpoint ── */
+
+.checkpointCard {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-glass);
+  border-radius: 4px 16px 16px 16px;
+  padding: 0.85rem 1rem;
+  max-width: 80%;
+  backdrop-filter: blur(16px) saturate(160%);
+  box-shadow: var(--shadow-md);
+}
+
+.checkpointTitle {
+  margin: 0 0 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.checkpointSummary {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.checkpointActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.checkpointConfirmBtn {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+  border-radius: var(--r-full);
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.checkpointConfirmBtn:hover:not(:disabled) {
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+}
+
+.checkpointConfirmBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.checkpointEditBtn {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  border-radius: var(--r-full);
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.checkpointEditBtn:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.checkpointEditBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 /* ── Status / typing indicator ── */
 .statusBubble {
   display: flex;

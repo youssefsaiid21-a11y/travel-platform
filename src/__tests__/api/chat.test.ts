@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NormalizedOffer } from "@/lib/duffel/types";
-import type { ChatResponse } from "@/app/api/chat/route";
+import type { ChatResponse, CheckpointEvent } from "@/app/api/chat/route";
 
 const mockCreate = vi.hoisted(() => vi.fn());
 
@@ -54,13 +54,13 @@ function makeToolResponse(args: Record<string, unknown>) {
   };
 }
 
-// Parse the SSE stream from a POST response and return the `done` event data
-async function readSSE(res: Response): Promise<ChatResponse> {
+// Parses a named SSE event's data out of a response (defaults to "done").
+async function readSSEEvent<T>(res: Response, eventName = "done"): Promise<T> {
   const reader = res.body!.getReader();
   const dec = new TextDecoder();
   let buf = "";
   let evt = "";
-  let result: ChatResponse | null = null;
+  let result: T | null = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -73,14 +73,37 @@ async function readSSE(res: Response): Promise<ChatResponse> {
         evt = line.slice(7).trim();
       } else if (line.startsWith("data: ")) {
         const data = JSON.parse(line.slice(6));
-        if (evt === "done") result = data as ChatResponse;
+        if (evt === eventName) result = data as T;
         evt = "";
       }
     }
   }
 
-  if (!result) throw new Error("SSE stream ended without a done event");
+  if (!result) throw new Error(`SSE stream ended without a "${eventName}" event`);
   return result;
+}
+
+async function readSSE(res: Response): Promise<ChatResponse> {
+  return readSSEEvent<ChatResponse>(res);
+}
+
+// Drives a normal (non-explore) search through both round trips a real
+// client makes post-Phase-3: the first request returns a "checkpoint"
+// event with the parsed params instead of searching immediately, and the
+// second (with confirmed_params) actually fires the search. Most tests
+// here care about the search's outcome, not the checkpoint step itself -
+// this keeps them focused on that. Explore-mode, knowledge-question, and
+// parse-failure tests are unaffected and keep using POST/readSSE directly,
+// since none of those paths ever reach the checkpoint gate.
+async function searchViaCheckpoint(
+  message: string,
+  session_id?: string
+): Promise<{ done: ChatResponse; session_id: string }> {
+  const checkpointRes = await POST(makeRequest({ message, session_id }));
+  const { params } = await readSSEEvent<CheckpointEvent>(checkpointRes, "checkpoint");
+  const doneRes = await POST(makeRequest({ message, session_id, confirmed_params: params }));
+  const done = await readSSE(doneRes);
+  return { done, session_id: done.session_id };
 }
 
 const MOCK_OFFER: NormalizedOffer = {
@@ -138,7 +161,7 @@ describe("POST /api/chat", () => {
     expect(res.status).toBe(400);
   });
 
-  it("initial search: parses NL, calls Duffel, returns offers via SSE", async () => {
+  it("shows a checkpoint with the parsed params before firing the real search", async () => {
     mockCreate.mockResolvedValueOnce(
       makeToolResponse({
         origin: "LHR",
@@ -154,7 +177,102 @@ describe("POST /api/chat", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/event-stream");
 
+    const { params } = await readSSEEvent<CheckpointEvent>(res, "checkpoint");
+    expect(params.origin).toBe("LHR");
+    expect(params.destination).toBe("JFK");
+    expect(vi.mocked(searchWithFallback)).not.toHaveBeenCalled();
+  });
+
+  it("confirmed_params skips NL parsing entirely and searches directly", async () => {
+    const res = await POST(
+      makeRequest({
+        message: "Fly London to New York September 1st",
+        confirmed_params: {
+          origin: "LHR",
+          destination: "JFK",
+          departure_date: "2026-09-01",
+          passengers: [{ type: "adult", count: 1 }],
+        },
+      })
+    );
     const body = await readSSE(res);
+
+    expect(body.offers).toHaveLength(1);
+    expect(body.search_params?.origin).toBe("LHR");
+    // Only generateSearchReply's own call, not a parse call too - confirming
+    // must not re-run the LLM parse on an already-understood message.
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(searchWithFallback)).toHaveBeenCalledTimes(1);
+  });
+
+  it("confirmed_params is still re-validated - a tampered/stale value can't skip validation", async () => {
+    const res = await POST(
+      makeRequest({
+        message: "Fly London to New York",
+        confirmed_params: {
+          origin: "LHR",
+          destination: "JFK",
+          departure_date: "2020-01-01", // long past
+          passengers: [{ type: "adult", count: 1 }],
+        },
+      })
+    );
+    const body = await readSSE(res);
+
+    expect(body.search_failed).toBe(true);
+    expect(vi.mocked(searchWithFallback)).not.toHaveBeenCalled();
+  });
+
+  it("records an assistant turn for the checkpoint, so a follow-up edit doesn't send two consecutive user messages to the LLM", async () => {
+    // Regression test: the checkpoint step used to record only a user turn
+    // and no assistant turn, so a follow-up message's nlParse call ended up
+    // with two "user" role messages back to back once nlParse's own
+    // "[Previous search parameters: ...]" context injection was added in -
+    // OpenAI-compatible APIs enforce strict role alternation, and this
+    // silently degraded/broke real follow-up parsing (caught via manual
+    // browser testing, not by the mocked unit tests below).
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "SYD",
+        destination: "SIN",
+        departure_date: "2026-08-01",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    const checkpointRes = await POST(makeRequest({ message: "Sydney to Singapore in August" }));
+    const { session_id, params } = await readSSEEvent<CheckpointEvent>(checkpointRes, "checkpoint");
+    expect(params.origin).toBe("SYD");
+
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "SYD",
+        destination: "SIN",
+        departure_date: "2026-08-01",
+        cabin_class: "business",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    await POST(makeRequest({ message: "make it business class instead", session_id }));
+
+    const followUpCall = mockCreate.mock.calls[1][0] as {
+      messages: Array<{ role: string }>;
+    };
+    for (let i = 1; i < followUpCall.messages.length; i++) {
+      expect(followUpCall.messages[i].role).not.toBe(followUpCall.messages[i - 1].role);
+    }
+  });
+
+  it("initial search: parses NL, calls Duffel, returns offers via SSE", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        destination: "JFK",
+        departure_date: "2026-09-01",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    const { done: body } = await searchViaCheckpoint("Fly London to New York September 1st");
+
     expect(body.session_id).toBeTruthy();
     expect(body.offers).toHaveLength(1);
     expect(body.offers[0].id).toBe("off_test_001");
@@ -171,10 +289,7 @@ describe("POST /api/chat", () => {
         passengers: [{ type: "adult", count: 1 }],
       })
     );
-    const first = await POST(
-      makeRequest({ message: "London to New York September 1st" })
-    );
-    const { session_id } = await readSSE(first);
+    const { session_id } = await searchViaCheckpoint("London to New York September 1st");
 
     const businessResult = {
       ...MOCK_SEARCH_RESULT,
@@ -191,10 +306,7 @@ describe("POST /api/chat", () => {
         passengers: [{ type: "adult", count: 1 }],
       })
     );
-    const second = await POST(
-      makeRequest({ message: "Make it business class", session_id })
-    );
-    const secondBody = await readSSE(second);
+    const { done: secondBody } = await searchViaCheckpoint("Make it business class", session_id);
 
     expect(secondBody.search_params?.cabin_class).toBe("business");
     expect(vi.mocked(searchWithFallback)).toHaveBeenCalledTimes(2);
@@ -210,8 +322,7 @@ describe("POST /api/chat", () => {
         passengers: [{ type: "adult", count: 1 }],
       })
     );
-    const first = await POST(makeRequest({ message: "LHR to JFK September 1" }));
-    const { session_id: sid1 } = await readSSE(first);
+    const { session_id: sid1 } = await searchViaCheckpoint("LHR to JFK September 1");
 
     mockCreate.mockResolvedValueOnce(
       makeToolResponse({
@@ -221,10 +332,7 @@ describe("POST /api/chat", () => {
         passengers: [{ type: "adult", count: 1 }],
       })
     );
-    const second = await POST(
-      makeRequest({ message: "show me economy options", session_id: sid1 })
-    );
-    const { session_id: sid2 } = await readSSE(second);
+    const { session_id: sid2 } = await searchViaCheckpoint("show me economy options", sid1);
 
     expect(sid1).toBe(sid2);
   });
@@ -288,8 +396,7 @@ describe("POST /api/chat", () => {
       )
     );
 
-    const res = await POST(makeRequest({ message: "LHR to Paris then Paris to XXX" }));
-    const body = await readSSE(res);
+    const { done: body } = await searchViaCheckpoint("LHR to Paris then Paris to XXX");
 
     expect(body.offers).toHaveLength(0);
     expect(body.search_failed).toBe(true);
@@ -408,8 +515,7 @@ describe("POST /api/chat", () => {
         passengers: [{ type: "adult", count: 1 }],
       })
     );
-    const res = await POST(makeRequest({ message: "London to JFK" }));
-    const body = await readSSE(res);
+    const { done: body } = await searchViaCheckpoint("London to JFK");
 
     const offer = body.offers[0] as NormalizedOffer;
     expect(offer.total_amount).toBe("350.00");

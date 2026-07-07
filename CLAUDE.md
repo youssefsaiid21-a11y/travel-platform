@@ -123,9 +123,23 @@ land instead of letting it go stale the way the old scope note did.
   (`prisma/migrations/20260707215113_user_token_version/`) but deliberately
   NOT run against the shared production Neon DB yet - needs explicit
   human approval, since local dev and prod share one database here.
-- **Phase 3 (UX):** an editable "here's what we understood" checkpoint in
-  chat between the user's message and the real search firing - today a
-  misparse only surfaces as wrong results, with no correctable moment.
+- **Phase 3 (UX) - DONE:** an editable "here's what we understood" checkpoint
+  (`checkpoint` SSE event, `ChatRequest.confirmed_params` to resume) between
+  the user's message and the real search firing. Editing is just sending a
+  normal follow-up message - no separate edit protocol. Surfaced a real,
+  pre-existing bug while building this: the checkpoint step wasn't recording
+  an assistant turn in session history, so a follow-up's LLM call ended up
+  with two consecutive "user" role messages (violates strict role
+  alternation) - fixed by recording a placeholder assistant reply at
+  checkpoint time and replacing it with the real reply once confirmed.
+  Separately (NOT fixed here, flagged for its own follow-up): manual
+  testing against the real Z.AI model found that ANY follow-up message
+  (checkpoint-edit or a normal completed-search follow-up, e.g. "make it
+  business class") reproducibly fails to return a tool call once the
+  "[Previous search parameters: ...]" context is injected - this is a
+  pre-existing nl-parser.ts reliability issue (see the earlier "Fix
+  intermittent 'Could not parse flight search'" commit), not something this
+  phase introduced, but it materially affects real usability of follow-ups.
 - **Phase 4 (process):** one nightly (not per-PR) smoke test against the
   real deployed app's `/api/chat`, sandbox-only - the only thing that
   would catch real Duffel/Z.AI schema drift, which the fully-mocked test

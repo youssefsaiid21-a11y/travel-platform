@@ -12,6 +12,14 @@ import type { ExploreDestinationResult, ExploreParams, SearchParams } from "@/li
 export interface ChatRequest {
   message: string;
   session_id?: string;
+  // Present only when the client is resuming after a "checkpoint" event
+  // (see below) - skips NL parsing entirely and searches these exact
+  // params instead, since re-running the LLM parse on a message that's
+  // already been correctly understood would be wasted work (and could
+  // theoretically parse differently the second time). Still re-validated
+  // with validateParams below - this is client-supplied data, and the
+  // client could be anything, not just this app's own frontend.
+  confirmed_params?: SearchParams;
 }
 
 // Shape of the `done` event data - used by client and tests
@@ -33,6 +41,14 @@ export interface ChatResponse {
   explore_params?: ExploreParams;
 }
 
+// Shape of the `checkpoint` event data - a normal (non-explore) search's
+// parsed params, surfaced for the user to confirm or edit before the real
+// Duffel search fires. See ChatRequest.confirmed_params for the resume path.
+export interface CheckpointEvent {
+  session_id: string;
+  params: SearchParams;
+}
+
 function sse(event: string, data: object): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
@@ -48,7 +64,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { message, session_id } = body;
+  const { message, session_id, confirmed_params } = body;
 
   if (!message?.trim()) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
@@ -62,31 +78,62 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(sse(event, data)));
       };
 
+      // The user's turn was already recorded in history when the checkpoint
+      // was first shown (see the checkpoint push below) - don't record it
+      // again when they come back having confirmed it, or history would
+      // have the same message twice.
+      const recordUserTurn = (session: Awaited<ReturnType<typeof getOrCreate>>) => {
+        if (!confirmed_params) {
+          session.history.push({ role: "user", content: message.trim() });
+        }
+      };
+
+      // Same idea for the assistant side: a confirmed request's turn already
+      // has a placeholder assistant reply from when the checkpoint was shown
+      // (the "here's what I understood" summary) - replace it with the real
+      // reply instead of pushing a second assistant turn back to back, which
+      // would break the strict user/assistant alternation nlParse's
+      // follow-up context relies on for the next message.
+      const recordAssistantReply = (session: Awaited<ReturnType<typeof getOrCreate>>, content: string) => {
+        if (confirmed_params && session.history.at(-1)?.role === "assistant") {
+          session.history[session.history.length - 1] = { role: "assistant", content };
+        } else {
+          session.history.push({ role: "assistant", content });
+        }
+      };
+
       try {
         const session = await getOrCreate(session_id);
 
-        // ── Step 1: parse ──────────────────────────────────────────────
-        push("status", { step: "parsing", message: "Understanding your request…" });
+        let params: SearchParams | null;
+        let error: string | null = null;
+        let exploreParams: ExploreParams | null = null;
 
-        const { params, error, answer, exploreParams } = await nlParse(
-          message.trim(),
-          session.history,
-          session.last_params
-        );
+        if (confirmed_params) {
+          params = confirmed_params;
+        } else {
+          // ── Step 1: parse ────────────────────────────────────────────
+          push("status", { step: "parsing", message: "Understanding your request…" });
 
-        // Knowledge question - answer directly, no Duffel call
-        if (answer) {
-          session.history.push({ role: "user", content: message.trim() });
-          session.history.push({ role: "assistant", content: answer });
-          await save(session);
-          push("done", {
-            session_id: session.id,
-            offers: [],
-            reply: answer,
-            search_params: null,
-          } satisfies ChatResponse);
-          controller.close();
-          return;
+          const parsed = await nlParse(message.trim(), session.history, session.last_params);
+          params = parsed.params;
+          error = parsed.error;
+          exploreParams = parsed.exploreParams;
+
+          // Knowledge question - answer directly, no Duffel call
+          if (parsed.answer) {
+            session.history.push({ role: "user", content: message.trim() });
+            session.history.push({ role: "assistant", content: parsed.answer });
+            await save(session);
+            push("done", {
+              session_id: session.id,
+              offers: [],
+              reply: parsed.answer,
+              search_params: null,
+            } satisfies ChatResponse);
+            controller.close();
+            return;
+          }
         }
 
         // No specific destination - "explore anywhere" mode. Skips
@@ -194,8 +241,8 @@ export async function POST(req: NextRequest) {
         // ── Step 2: validate ───────────────────────────────────────────
         const validationError = validateParams(params);
         if (validationError) {
-          session.history.push({ role: "user", content: message.trim() });
-          session.history.push({ role: "assistant", content: validationError });
+          recordUserTurn(session);
+          recordAssistantReply(session, validationError);
           await save(session);
           push("done", {
             session_id: session.id,
@@ -204,6 +251,37 @@ export async function POST(req: NextRequest) {
             search_params: params,
             search_failed: true,
           } satisfies ChatResponse);
+          controller.close();
+          return;
+        }
+
+        // ── Checkpoint: confirm before the real search fires ───────────
+        // Surfaces the parsed params for the user to confirm or edit,
+        // rather than immediately spending a real Duffel call on a
+        // possible misparse. Skipped when confirmed_params was provided -
+        // that request IS the confirmation, so it goes straight to
+        // searching. Editing is just sending a normal follow-up message;
+        // nlParse already merges it against session.last_params (set
+        // below), so no separate "edit" protocol is needed.
+        if (!confirmed_params) {
+          const checkpointSummary =
+            `${params.origin} → ${params.destination} on ${params.departure_date}` +
+            (params.return_date ? ` (returning ${params.return_date})` : "");
+          session.history.push({ role: "user", content: message.trim() });
+          // nlParse's follow-up context injects its own user+assistant pair
+          // (the "[Previous search parameters: ...]" message) right after
+          // whatever's already in history - without an assistant turn here,
+          // that would put two "user" messages back to back, which the LLM
+          // API rejects/mishandles (strict role alternation). This keeps
+          // history alternating correctly for the next message, whether
+          // it's a "confirm" or an edit.
+          session.history.push({
+            role: "assistant",
+            content: `Here's what I understood: ${checkpointSummary}. Let me know if that's not right, or confirm to search.`,
+          });
+          session.last_params = params;
+          await save(session);
+          push("checkpoint", { session_id: session.id, params } satisfies CheckpointEvent);
           controller.close();
           return;
         }
@@ -250,8 +328,8 @@ export async function POST(req: NextRequest) {
 
         if (searchError) {
           const reply = searchError;
-          session.history.push({ role: "user", content: message.trim() });
-          session.history.push({ role: "assistant", content: reply });
+          recordUserTurn(session);
+          recordAssistantReply(session, reply);
           await save(session);
           push("done", {
             session_id: session.id,
@@ -298,8 +376,8 @@ export async function POST(req: NextRequest) {
           ),
         ]);
 
-        session.history.push({ role: "user", content: message.trim() });
-        session.history.push({ role: "assistant", content: reply });
+        recordUserTurn(session);
+        recordAssistantReply(session, reply);
         session.last_params = usedParams;
         session.last_offers = offers;
         await save(session);

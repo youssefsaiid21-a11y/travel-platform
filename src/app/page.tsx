@@ -9,7 +9,7 @@ import { PriceCalendarSection } from "@/components/PriceCalendarSection";
 import { ExploreResults } from "@/components/ExploreResults";
 import { OrbiWordmark, OrbiMark } from "@/components/OrbiLogo";
 import { FlightPath } from "@/components/FlightPath";
-import type { ChatResponse } from "@/app/api/chat/route";
+import { consumeChatStream } from "@/lib/chat/consumeChatStream";
 import type { NormalizedOffer } from "@/lib/duffel/types";
 import type { PriceCalendarEntry } from "@/lib/duffel/search";
 import type { ExploreDestinationResult, ExploreParams, SearchParams } from "@/lib/parser/types";
@@ -24,6 +24,19 @@ interface Message {
   searchFailed?: boolean;
   exploreResults?: ExploreDestinationResult[];
   exploreParams?: ExploreParams;
+  // Present only for a not-yet-confirmed "here's what we understood"
+  // checkpoint - rendered as a summary + confirm/edit prompt instead of
+  // offers, and gates the real Duffel search behind an explicit confirm.
+  checkpoint?: { params: SearchParams; originalMessage: string };
+}
+
+function summarizeParams(params: SearchParams): string {
+  const paxCount = params.passengers.reduce((sum, p) => sum + p.count, 0);
+  const paxLabel = `${paxCount} ${paxCount === 1 ? "passenger" : "passengers"}`;
+  const tripLabel = params.return_date
+    ? `${params.departure_date} – ${params.return_date}`
+    : params.departure_date;
+  return `${params.origin} → ${params.destination} · ${tripLabel} · ${paxLabel}`;
 }
 
 const EXAMPLE_QUERIES = [
@@ -200,78 +213,62 @@ export default function Home() {
           return;
         }
 
-        if (!res.ok || !res.body) {
+        if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buf = "";
-        let evt = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buf += decoder.decode(value, { stream: true });
-          const lines = buf.split("\n");
-          buf = lines.pop() ?? "";
-
-          for (const line of lines) {
-            if (line.startsWith("event: ")) {
-              evt = line.slice(7).trim();
-            } else if (line.startsWith("data: ")) {
-              const data = JSON.parse(line.slice(6)) as Record<string, unknown>;
-
-              if (evt === "status") {
-                setStatusMsg((data.message as string) ?? "");
-                setStatusStep((data.step as string) ?? "");
-              } else if (evt === "reply_token") {
-                setStreamingReply((prev) => prev + ((data.delta as string) ?? ""));
-              } else if (evt === "done") {
-                const body = data as unknown as ChatResponse;
-                if (body.session_id) setSessionId(body.session_id);
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    role: "assistant",
-                    content: body.reply,
-                    offers: body.offers,
-                    searchParams: body.search_params,
-                    priceCalendar: body.price_calendar,
-                    searchFailed: body.search_failed,
-                    exploreResults: body.explore_results,
-                    exploreParams: body.explore_params,
-                  },
-                ]);
-                // Save to recent searches if offers were returned
-                if (body.offers && body.offers.length > 0) {
-                  setRecentSearches((prev) => {
-                    const next = [trimmed, ...prev.filter((s) => s !== trimmed)].slice(0, MAX_RECENT);
-                    try { localStorage.setItem("recent_searches", JSON.stringify(next)); } catch { /* ignore */ }
-                    return next;
-                  });
-                }
-                setStatusMsg("");
-                setStatusStep("");
-                setStreamingReply("");
-              } else if (evt === "error") {
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    role: "assistant",
-                    content: (data.message as string) ?? "Something went wrong.",
-                  },
-                ]);
-                setStatusMsg("");
-                setStatusStep("");
-                setStreamingReply("");
-              }
-
-              evt = "";
+        await consumeChatStream(res, {
+          onStatus: (step, message) => {
+            setStatusMsg(message);
+            setStatusStep(step);
+          },
+          onReplyToken: (delta) => {
+            setStreamingReply((prev) => prev + delta);
+          },
+          onCheckpoint: ({ session_id, params }) => {
+            setSessionId(session_id);
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: "", checkpoint: { params, originalMessage: trimmed } },
+            ]);
+            setStatusMsg("");
+            setStatusStep("");
+            setStreamingReply("");
+          },
+          onDone: (body) => {
+            if (body.session_id) setSessionId(body.session_id);
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: body.reply,
+                offers: body.offers,
+                searchParams: body.search_params,
+                priceCalendar: body.price_calendar,
+                searchFailed: body.search_failed,
+                exploreResults: body.explore_results,
+                exploreParams: body.explore_params,
+              },
+            ]);
+            // Save to recent searches if offers were returned
+            if (body.offers && body.offers.length > 0) {
+              setRecentSearches((prev) => {
+                const next = [trimmed, ...prev.filter((s) => s !== trimmed)].slice(0, MAX_RECENT);
+                try { localStorage.setItem("recent_searches", JSON.stringify(next)); } catch { /* ignore */ }
+                return next;
+              });
             }
-          }
-        }
+            setStatusMsg("");
+            setStatusStep("");
+            setStreamingReply("");
+          },
+          onError: (message) => {
+            setMessages((prev) => [...prev, { role: "assistant", content: message }]);
+            setStatusMsg("");
+            setStatusStep("");
+            setStreamingReply("");
+          },
+        });
       } catch {
         setMessages((prev) => [
           ...prev,
@@ -286,6 +283,106 @@ export default function Home() {
       }
     },
     [loading, sessionId]
+  );
+
+  // Resumes a "checkpoint" message (see Message.checkpoint) by confirming
+  // the already-parsed params, skipping NL parsing entirely. Updates the
+  // checkpoint message in place rather than appending a new one, since the
+  // checkpoint IS this turn's assistant response - the real search result
+  // replaces it once it arrives, it isn't a second reply after it.
+  const confirmCheckpoint = useCallback(
+    async (messageIdx: number) => {
+      const target = messages[messageIdx];
+      if (!target?.checkpoint || loading) return;
+      const { params, originalMessage } = target.checkpoint;
+
+      setLoading(true);
+      setStatusMsg(STEP_LABELS.searching);
+      setStatusStep("searching");
+      setStreamingReply("");
+
+      const replaceCheckpoint = (message: Message) => {
+        setMessages((prev) => {
+          const next = [...prev];
+          next[messageIdx] = message;
+          return next;
+        });
+      };
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: originalMessage,
+            session_id: sessionId,
+            confirmed_params: params,
+          }),
+        });
+
+        if (res.status === 429) {
+          const body = await res.json().catch(() => ({ error: "" })) as { error?: string };
+          replaceCheckpoint({
+            role: "assistant",
+            content: body.error ?? "Too many searches. Please wait a moment before trying again.",
+          });
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        await consumeChatStream(res, {
+          onStatus: (step, message) => {
+            setStatusMsg(message);
+            setStatusStep(step);
+          },
+          onReplyToken: (delta) => {
+            setStreamingReply((prev) => prev + delta);
+          },
+          onDone: (body) => {
+            if (body.session_id) setSessionId(body.session_id);
+            replaceCheckpoint({
+              role: "assistant",
+              content: body.reply,
+              offers: body.offers,
+              searchParams: body.search_params,
+              priceCalendar: body.price_calendar,
+              searchFailed: body.search_failed,
+            });
+            if (body.offers && body.offers.length > 0) {
+              setRecentSearches((prev) => {
+                const next = [originalMessage, ...prev.filter((s) => s !== originalMessage)].slice(0, MAX_RECENT);
+                try { localStorage.setItem("recent_searches", JSON.stringify(next)); } catch { /* ignore */ }
+                return next;
+              });
+            }
+            setStatusMsg("");
+            setStatusStep("");
+            setStreamingReply("");
+          },
+          onError: (message) => {
+            replaceCheckpoint({ role: "assistant", content: message });
+            setStatusMsg("");
+            setStatusStep("");
+            setStreamingReply("");
+          },
+        });
+      } catch {
+        replaceCheckpoint({
+          role: "assistant",
+          content: "Something went wrong. Please try again.",
+        });
+        setStatusMsg("");
+        setStatusStep("");
+        setStreamingReply("");
+      } finally {
+        setLoading(false);
+        setTimeout(() => inputRef.current?.focus(), 50);
+      }
+    },
+    [messages, loading, sessionId]
   );
 
   useEffect(() => {
@@ -405,6 +502,41 @@ export default function Home() {
               <div key={i} className={styles.userRow}>
                 <div className={styles.userBubble}>
                   <p>{msg.content}</p>
+                </div>
+              </div>
+            );
+          }
+
+          if (msg.checkpoint) {
+            return (
+              <div key={i} className={styles.assistantRow}>
+                <div className={styles.assistantHeader}>
+                  <div className={styles.assistantAvatar}>
+                    <OrbiMark tone="mono" className={styles.assistantAvatarMark} />
+                  </div>
+                  <span className={styles.assistantLabel}>Orbi</span>
+                </div>
+                <div className={styles.checkpointCard}>
+                  <p className={styles.checkpointTitle}>Here&apos;s what I understood:</p>
+                  <p className={styles.checkpointSummary}>{summarizeParams(msg.checkpoint.params)}</p>
+                  <div className={styles.checkpointActions}>
+                    <button
+                      type="button"
+                      className={styles.checkpointConfirmBtn}
+                      onClick={() => confirmCheckpoint(i)}
+                      disabled={loading || !isLastAssistant}
+                    >
+                      Confirm search
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.checkpointEditBtn}
+                      onClick={() => inputRef.current?.focus()}
+                      disabled={loading || !isLastAssistant}
+                    >
+                      Edit
+                    </button>
+                  </div>
                 </div>
               </div>
             );
