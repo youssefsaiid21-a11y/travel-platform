@@ -74,7 +74,7 @@ function makeTracked(overrides: Partial<TrackedSearchWithUser> = {}): TrackedSea
     destination: "JFK",
     departureDate: "2026-10-01",
     returnDate: null,
-    passengers: JSON.stringify([{ type: "adult", count: 1 }]),
+    passengers: [{ type: "adult", count: 1 }],
     cabinClass: null,
     preferRefundable: false,
     preferChangeable: false,

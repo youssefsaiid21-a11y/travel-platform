@@ -18,7 +18,7 @@ const OWNER_ID = "usr_owner_001";
 const OTHER_ID = "usr_other_002";
 const BOOKING_ID = "bkng_abc123";
 
-const OFFER_SNAPSHOT = JSON.stringify({
+const OFFER_SNAPSHOT = {
   slices: [
     {
       segments: [
@@ -26,7 +26,7 @@ const OFFER_SNAPSHOT = JSON.stringify({
       ],
     },
   ],
-});
+};
 
 function makeParams(id: string) {
   return { params: Promise.resolve({ id }) };

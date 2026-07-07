@@ -86,9 +86,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const passengerNames = JSON.stringify(
-    passengers.map((p) => `${p.given_name} ${p.family_name}`)
-  );
+  const passengerNames = passengers.map((p) => `${p.given_name} ${p.family_name}`);
 
   // Claim this PaymentIntent with a "pending" row BEFORE doing anything
   // expensive (verifying the offer, calling Duffel). stripePaymentIntentId
@@ -109,8 +107,8 @@ export async function POST(req: NextRequest) {
         status: "pending",
         totalAmount: (pi.amount / 100).toFixed(2),
         totalCurrency: pi.currency.toUpperCase(),
-        offerSnapshot: JSON.stringify({ offerId }),
-        searchParams: JSON.stringify(searchParams),
+        offerSnapshot: { offerId } as Prisma.InputJsonValue,
+        searchParams: searchParams as unknown as Prisma.InputJsonValue,
         passengerNames,
         stripePaymentIntentId,
         ...(specialRequests ? { specialRequests } : {}),
@@ -155,10 +153,10 @@ export async function POST(req: NextRequest) {
       where: { id: booking.id },
       data: {
         status: "failed",
-        offerSnapshot: JSON.stringify({
+        offerSnapshot: {
           offerId,
           reason: err instanceof DuffelError ? "offer_unavailable" : "offer_verification_failed",
-        }),
+        },
       },
     });
     if (err instanceof DuffelError) {
@@ -184,7 +182,7 @@ export async function POST(req: NextRequest) {
         status: "failed",
         totalAmount: offer.total_amount,
         totalCurrency: offer.total_currency,
-        offerSnapshot: JSON.stringify(offer),
+        offerSnapshot: offer as unknown as Prisma.InputJsonValue,
       },
     });
     return NextResponse.json(
@@ -254,7 +252,7 @@ export async function POST(req: NextRequest) {
       status,
       totalAmount: offer.total_amount,
       totalCurrency: offer.total_currency,
-      offerSnapshot: JSON.stringify(offer),
+      offerSnapshot: offer as unknown as Prisma.InputJsonValue,
     },
     include: {
       user: {

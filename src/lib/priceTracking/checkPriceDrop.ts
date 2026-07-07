@@ -33,7 +33,7 @@ export interface TrackedSearchRow {
   destination: string;
   departureDate: string;
   returnDate: string | null;
-  passengers: string; // JSON-encoded SearchParams["passengers"]
+  passengers: unknown; // SearchParams["passengers"]
   cabinClass: string | null;
   preferRefundable: boolean;
   preferChangeable: boolean;
@@ -55,7 +55,7 @@ export function trackedSearchToSearchParams(tracked: TrackedSearchRow): SearchPa
     destination: tracked.destination,
     departure_date: tracked.departureDate,
     ...(tracked.returnDate ? { return_date: tracked.returnDate } : {}),
-    passengers: JSON.parse(tracked.passengers) as SearchParams["passengers"],
+    passengers: tracked.passengers as SearchParams["passengers"],
     ...(tracked.cabinClass
       ? { cabin_class: tracked.cabinClass as SearchParams["cabin_class"] }
       : {}),

@@ -65,9 +65,9 @@ model Booking {
   status                String   @default("pending")
   totalAmount           String
   totalCurrency         String
-  offerSnapshot         String
-  searchParams          String
-  passengerNames        String
+  offerSnapshot         Json
+  searchParams          Json
+  passengerNames        Json
   stripePaymentIntentId String?
   specialRequests       String?
   createdAt             DateTime @default(now())
@@ -93,8 +93,8 @@ model TrackedSearch {
   destination       String
   departureDate     String
   returnDate        String?
-  // JSON-encoded SearchParams["passengers"], e.g. [{"type":"adult","count":1}]
-  passengers        String
+  // SearchParams["passengers"], e.g. [{"type":"adult","count":1}]
+  passengers        Json
   cabinClass        String?
   // Preference filters from the original search - carried over so the price
   // re-check compares against the same filtered results the user actually

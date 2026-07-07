@@ -31,10 +31,10 @@ import BookingsPage from "@/app/bookings/page";
 const USER_ID = "usr_owner_001";
 const BOOKING_ID = "bkng_failed_001";
 
-const UNVERIFIABLE_OFFER_SNAPSHOT = JSON.stringify({
+const UNVERIFIABLE_OFFER_SNAPSHOT = {
   offerId: "off_gone",
   reason: "offer_unavailable",
-});
+};
 
 function baseBooking(overrides: Record<string, unknown> = {}) {
   return {
@@ -44,8 +44,8 @@ function baseBooking(overrides: Record<string, unknown> = {}) {
     totalAmount: "342.50",
     totalCurrency: "GBP",
     offerSnapshot: UNVERIFIABLE_OFFER_SNAPSHOT,
-    searchParams: JSON.stringify({ origin: "LHR", destination: "JFK" }),
-    passengerNames: JSON.stringify(["Jane Smith"]),
+    searchParams: { origin: "LHR", destination: "JFK" },
+    passengerNames: ["Jane Smith"],
     duffelBookingRef: null,
     duffelOrderId: null,
     stripePaymentIntentId: "pi_test_001",
@@ -80,12 +80,12 @@ describe("BookingsPage with an unverifiable offer snapshot in the list", () => {
     mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
     mockFindMany.mockResolvedValueOnce([
       baseBooking(),
-      baseBooking({ id: "bkng_ok_001", status: "confirmed", offerSnapshot: JSON.stringify({
+      baseBooking({ id: "bkng_ok_001", status: "confirmed", offerSnapshot: {
         owner: { name: "Duffel Airways" },
         slices: [
           { segments: [{ origin: { iata_code: "LHR" }, destination: { iata_code: "JFK" }, departing_at: "2026-08-01T10:00:00Z" }] },
         ],
-      }) }),
+      } }),
     ]);
 
     await expect(BookingsPage()).resolves.toBeTruthy();

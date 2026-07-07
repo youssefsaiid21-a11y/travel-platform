@@ -143,7 +143,7 @@ describe("POST /api/tracked-searches", () => {
     // silently overwrite) an existing 1-adult tracked search for the same route/date.
     expect(mockFindFirst).toHaveBeenCalledWith({
       where: expect.objectContaining({
-        passengers: JSON.stringify(familyParams.passengers),
+        passengers: { equals: familyParams.passengers },
       }),
     });
   });

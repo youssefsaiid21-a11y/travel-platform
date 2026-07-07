@@ -22,11 +22,11 @@ function buildNotificationData(booking: {
   duffelBookingRef: string | null;
   totalAmount: string;
   totalCurrency: string;
-  offerSnapshot: string;
-  passengerNames: string;
+  offerSnapshot: unknown;
+  passengerNames: unknown;
   user: { email: string; passengerProfile: { phone: string } | null };
 }): BookingNotificationData {
-  const offer = JSON.parse(booking.offerSnapshot) as NormalizedOffer;
+  const offer = booking.offerSnapshot as NormalizedOffer;
   const firstSeg = offer.slices[0]?.segments[0];
   const lastSeg = offer.slices[0]?.segments.at(-1);
 
@@ -40,7 +40,7 @@ function buildNotificationData(booking: {
       })
     : "-";
 
-  const names = JSON.parse(booking.passengerNames) as string[];
+  const names = booking.passengerNames as string[];
   const passengerName = names[0] ?? "Passenger";
 
   return {

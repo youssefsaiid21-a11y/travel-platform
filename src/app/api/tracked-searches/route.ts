@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing current price" }, { status: 400 });
   }
 
-  const passengers = JSON.stringify(searchParams.passengers);
+  const passengers = searchParams.passengers;
 
   // Avoid piling up duplicate rows if the user clicks "track" on the same
   // search twice - refresh the existing row's price instead. Must match on
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       destination: searchParams.destination,
       departureDate: searchParams.departure_date,
       returnDate: searchParams.return_date ?? null,
-      passengers,
+      passengers: { equals: passengers as Prisma.InputJsonValue },
       cabinClass: searchParams.cabin_class ?? null,
       preferRefundable: !!searchParams.prefer_refundable,
       preferChangeable: !!searchParams.prefer_changeable,

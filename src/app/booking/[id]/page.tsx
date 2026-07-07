@@ -30,7 +30,7 @@ export async function generateMetadata({
   // booking id should see the same generic title as a 404.
   if (!booking || booking.userId !== session.user.id) return { title: "Booking · Orbi", ...noindex };
   try {
-    const offer = JSON.parse(booking.offerSnapshot) as NormalizedOffer;
+    const offer = booking.offerSnapshot as unknown as NormalizedOffer;
     const seg0 = offer.slices[0].segments[0];
     const segLast = offer.slices[0].segments[offer.slices[0].segments.length - 1];
     const route = `${seg0.origin.iata_code} → ${segLast.destination.iata_code}`;
@@ -75,7 +75,7 @@ export default async function BookingDetailPage({
   // verified (see POST /api/booking) has no real offer to snapshot - its
   // offerSnapshot is a minimal { offerId, reason } record instead of a full
   // NormalizedOffer, so this must not assume `.slices` exists.
-  const offerSnapshotRaw = JSON.parse(booking.offerSnapshot) as unknown;
+  const offerSnapshotRaw = booking.offerSnapshot as unknown;
   const offer =
     offerSnapshotRaw &&
     typeof offerSnapshotRaw === "object" &&
@@ -83,7 +83,7 @@ export default async function BookingDetailPage({
     (offerSnapshotRaw as NormalizedOffer).slices.length > 0
       ? (offerSnapshotRaw as NormalizedOffer)
       : null;
-  const passengerNames = JSON.parse(booking.passengerNames) as string[];
+  const passengerNames = booking.passengerNames as unknown as string[];
 
   // Post-booking flight status: re-fetch the order from Duffel and diff its
   // current segment times against what was booked. Read-only - this never

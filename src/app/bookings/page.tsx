@@ -30,9 +30,9 @@ function fmtAmount(amount: string, currency: string) {
   }
 }
 
-function buildSearchQuery(searchParamsJson: string, offer: NormalizedOffer): string {
+function buildSearchQuery(searchParamsRaw: unknown, offer: NormalizedOffer): string {
   try {
-    const p = JSON.parse(searchParamsJson) as SearchParams;
+    const p = searchParamsRaw as SearchParams;
     const cabin = p.cabin_class && p.cabin_class !== "economy" ? `${p.cabin_class} ` : "";
     const paxCount = p.passengers.reduce((n, p) => n + p.count, 0);
     const pax = paxCount > 1 ? `${paxCount} passengers ` : "";
@@ -90,7 +90,7 @@ export default async function BookingsPage() {
               // never be verified (see POST /api/booking) has a minimal
               // { offerId, reason } snapshot instead of a full offer - one
               // such row must not crash the whole list.
-              const raw = JSON.parse(b.offerSnapshot) as unknown;
+              const raw = b.offerSnapshot as unknown;
               const offer =
                 raw &&
                 typeof raw === "object" &&

@@ -149,11 +149,22 @@ land instead of letting it go stale the way the old scope note did.
   structurally cannot, but too slow/costly/vendor-dependent to gate merges
   on. `SMOKE_TEST_URL` repo variable overrides the default prod URL if the
   deployment domain ever changes.
-- **Phase 5 (data model, timing driven by Sentry data, not fixed-last):**
-  migrate `Booking.offerSnapshot`/`searchParams`/`passengerNames` and
+- **Phase 5 (code done, migration NOT yet applied to prod):** migrated
+  `Booking.offerSnapshot`/`searchParams`/`passengerNames` and
   `TrackedSearch.passengers` from hand-serialized `String` JSON to native
   Prisma `Json` columns - the exact pattern behind a real "uncaught
-  JSON.parse" bug class already fixed once.
+  JSON.parse" bug class already fixed once. All read/write call sites
+  updated (no more manual `JSON.parse`/`JSON.stringify`); `TrackedSearch`'s
+  duplicate-tracking lookup now compares via `{ equals: ... }` on the Json
+  field, which is also a correctness improvement over the old TEXT-based
+  approach - jsonb equality is key-order-independent, string equality
+  wasn't. Migration file is written
+  (`prisma/migrations/20260707224602_booking_json_columns/`) but
+  deliberately NOT run against the shared production Neon DB yet - this
+  ALTERs existing columns with existing customer booking data (`USING
+  col::jsonb`, which fails loudly if any row's text isn't valid JSON,
+  rather than silently corrupting it) - needs explicit human approval
+  before running, same as Phase 2's migration.
 - **Open product decisions, not code tasks:** should `PassengerProfile`
   support more than one saved passenger per account (bookings already
   support multiple passengers per transaction, saved-profile convenience
