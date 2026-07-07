@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (process.env.NODE_ENV !== "test") {
-    const rl = checkRateLimit(`booking:${session.user.id}`, { max: 5, windowMs: 60_000 });
+    const rl = await checkRateLimit(`booking:${session.user.id}`, { max: 5, windowMs: 60_000 });
     if (!rl.ok) {
       return NextResponse.json(
         { error: "Too many booking attempts. Please wait before trying again." },

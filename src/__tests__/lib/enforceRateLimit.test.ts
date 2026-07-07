@@ -21,23 +21,23 @@ afterEach(() => {
 });
 
 describe("enforceRateLimit", () => {
-  it("namespaces budgets by routeKey so one route can't starve another's quota", () => {
+  it("namespaces budgets by routeKey so one route can't starve another's quota", async () => {
     const ip = "203.0.113.5";
     for (let i = 0; i < 8; i++) {
-      expect(enforceRateLimit(makeRequest(ip), "chat")).toBeNull();
+      expect(await enforceRateLimit(makeRequest(ip), "chat")).toBeNull();
     }
     // "chat" budget is exhausted for this IP...
-    expect(enforceRateLimit(makeRequest(ip), "chat")).not.toBeNull();
+    expect(await enforceRateLimit(makeRequest(ip), "chat")).not.toBeNull();
     // ...but "offer-services" has its own independent budget for the same IP.
-    expect(enforceRateLimit(makeRequest(ip), "offer-services")).toBeNull();
+    expect(await enforceRateLimit(makeRequest(ip), "offer-services")).toBeNull();
   });
 
-  it("returns a 429 with a Retry-After header once a route's budget is exhausted", () => {
+  it("returns a 429 with a Retry-After header once a route's budget is exhausted", async () => {
     const ip = "203.0.113.9";
     for (let i = 0; i < 8; i++) {
-      enforceRateLimit(makeRequest(ip), "chat");
+      await enforceRateLimit(makeRequest(ip), "chat");
     }
-    const res = enforceRateLimit(makeRequest(ip), "chat");
+    const res = await enforceRateLimit(makeRequest(ip), "chat");
     expect(res).not.toBeNull();
     expect(res!.status).toBe(429);
     expect(res!.headers.get("Retry-After")).toBeTruthy();

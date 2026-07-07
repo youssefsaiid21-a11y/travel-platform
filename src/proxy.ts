@@ -23,7 +23,10 @@ function buildCsp(nonce: string) {
     // assets.duffel.com serves the airline logos in offer.owner.logo_symbol_url.
     "img-src 'self' data: https://assets.duffel.com",
     "font-src 'self'",
-    "connect-src 'self' https://api.stripe.com",
+    // *.sentry.io covers both ingest.sentry.io (US) and ingest.de.sentry.io
+    // (EU) - which region a given DSN posts to depends on which Sentry org
+    // region it was created in, not something this app controls.
+    "connect-src 'self' https://api.stripe.com https://*.sentry.io",
     "frame-src https://js.stripe.com https://hooks.stripe.com",
     "object-src 'none'",
     "base-uri 'self'",

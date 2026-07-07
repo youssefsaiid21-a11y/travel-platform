@@ -92,13 +92,18 @@ land instead of letting it go stale the way the old scope note did.
   unwired from production (a deliberate "prove the merge logic works"
   exercise, not an accidental orphan - `search.ts`'s `searchWithFallback`
   is the real path `chat/route.ts` calls). Revisit deleting `lib/fares/` if
-  a second real fare source still isn't scoped in a few months.
-- **Phase 1a (no migration needed):** Sentry; real distributed rate
-  limiting (Upstash Redis, fail-open to the existing in-memory limiter on
-  a Redis error so an outage degrades protection rather than removing it,
-  or disabling the deliberately-anonymous `/api/chat` path entirely); a
-  stricter limit specifically for "explore anywhere" mode (~26 real Duffel
-  calls per message); `ChatSession` row TTL cleanup (unbounded today).
+  a second real fare source still isn't scoped in a few months. CI/branch
+  protection remain blocked on a GitHub remote existing - not yet done.
+- **Phase 1a (no migration needed) - DONE:** Sentry (`@sentry/nextjs`,
+  wired via `instrumentation.ts`/`instrumentation-client.ts` and both error
+  boundaries; no-ops safely with no `SENTRY_DSN` set); real distributed
+  rate limiting (`src/lib/rate-limit.ts` now tries Upstash Redis first with
+  a 150ms timeout, falling back to the pre-existing in-memory limiter on
+  any error/timeout or when Upstash env vars aren't set at all - an outage
+  degrades protection rather than removing it); a stricter limit
+  specifically for "explore anywhere" mode (~26 real Duffel calls per
+  message, `explore:{ip}`, max 3/min); `ChatSession` row TTL cleanup (daily
+  cron, 30-day cutoff, `src/app/api/cron/cleanup-chat-sessions/`).
 - **Phase 1b (cron ceiling):** `check-price-drops` has no `maxDuration` set
   and the tracked-search table has no upper bound - add `maxDuration` now
   as a cheap stopgap. A real per-item queue (e.g. Upstash QStash) is the

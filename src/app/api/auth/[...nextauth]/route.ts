@@ -9,7 +9,7 @@ export const { GET } = handlers;
 // share this budget.
 export async function POST(req: NextRequest) {
   if (req.nextUrl.pathname.endsWith("/callback/credentials")) {
-    const rateLimited = enforceRateLimit(req, "login");
+    const rateLimited = await enforceRateLimit(req, "login");
     if (rateLimited) return rateLimited;
   }
   return handlers.POST(req);

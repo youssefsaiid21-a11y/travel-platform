@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   // this is the most expensive operation in the app (one Duffel search per
   // tracked row, unbounded concurrency), so it shouldn't be exempt from the
   // rate-limiting every other route here has.
-  const rateLimited = enforceRateLimit(req, "cron-check-price-drops");
+  const rateLimited = await enforceRateLimit(req, "cron-check-price-drops");
   if (rateLimited) return rateLimited;
 
   const today = new Date().toISOString().split("T")[0];

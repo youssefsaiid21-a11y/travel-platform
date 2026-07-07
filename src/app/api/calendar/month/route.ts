@@ -20,7 +20,7 @@ export interface MonthCalendarResponse {
 // calendar - a full month is up to ~31 Duffel searches, so it's kept out of
 // the hot chat/route.ts path (which only ever loads the ±3 day strip).
 export async function POST(req: NextRequest) {
-  const rateLimited = enforceRateLimit(req, "calendar-month");
+  const rateLimited = await enforceRateLimit(req, "calendar-month");
   if (rateLimited) return rateLimited;
 
   let body: MonthCalendarRequest;

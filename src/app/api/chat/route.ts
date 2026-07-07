@@ -38,7 +38,7 @@ function sse(event: string, data: object): string {
 }
 
 export async function POST(req: NextRequest) {
-  const rateLimited = enforceRateLimit(req, "chat");
+  const rateLimited = await enforceRateLimit(req, "chat");
   if (rateLimited) return rateLimited;
 
   let body: ChatRequest;
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
           // Duffel-call budget via repeated explore-mode messages, without
           // narrowing the normal search path's limit.
           if (process.env.NODE_ENV !== "test") {
-            const exploreLimit = checkRateLimit(`explore:${getClientIp(req)}`, {
+            const exploreLimit = await checkRateLimit(`explore:${getClientIp(req)}`, {
               max: 3,
               windowMs: 60_000,
             });

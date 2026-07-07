@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (process.env.NODE_ENV !== "test") {
-    const rl = checkRateLimit(`change-password:${session.user.id}`, { max: 5, windowMs: 60_000 });
+    const rl = await checkRateLimit(`change-password:${session.user.id}`, { max: 5, windowMs: 60_000 });
     if (!rl.ok) {
       return NextResponse.json(
         { error: "Too many attempts. Please wait before trying again." },

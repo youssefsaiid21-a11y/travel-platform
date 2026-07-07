@@ -10,7 +10,7 @@ function isUniqueConstraintError(err: unknown): boolean {
 
 export async function POST(req: NextRequest) {
   if (process.env.NODE_ENV !== "test") {
-    const rl = checkRateLimit(`reg:${getClientIp(req)}`, { max: 5, windowMs: 60 * 60 * 1000 });
+    const rl = await checkRateLimit(`reg:${getClientIp(req)}`, { max: 5, windowMs: 60 * 60 * 1000 });
     if (!rl.ok) {
       return NextResponse.json(
         { error: "Too many registration attempts. Please try again later." },

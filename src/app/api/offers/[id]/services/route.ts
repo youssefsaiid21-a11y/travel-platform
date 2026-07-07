@@ -7,7 +7,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const rateLimited = enforceRateLimit(req, "offer-services");
+  const rateLimited = await enforceRateLimit(req, "offer-services");
   if (rateLimited) return rateLimited;
 
   const { id } = await params;
