@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      # Placeholders, not real credentials - nothing here needs to be a
+      # reachable service. `prisma generate` only needs DATABASE_URL to be
+      # set (schema validation), not connectable, since no test or the
+      # build itself touches a live database - db.ts is mocked in every
+      # test file that needs it. The rest just need to exist so a
+      # module-scope `new OpenAI(...)`/`new Stripe(...)` client
+      # construction doesn't throw during `next build`'s static analysis;
+      # none of these are called for real outside an actual request.
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
+      # Deliberately does NOT start with "duffel_test_" - one existing test
+      # (src/__tests__/duffel/search.test.ts) makes a REAL call to Duffel's
+      # real sandbox API whenever the key matches that prefix (its guard
+      # only checks the prefix pattern, not whether the key is genuinely
+      # valid), which is exactly right for local dev with a real sandbox
+      # key but wrong for this job - real-network integration tests belong
+      # in the separate nightly smoke test (Phase 4), not blocking every
+      # push/PR on Duffel's API being reachable.
+      DUFFEL_API_KEY: "not-configured-in-ci"
+      ZHIPU_API_KEY: "ci_placeholder"
+      NEXTAUTH_SECRET: "ci_placeholder_secret_ci_placeholder_secret"
+      NEXTAUTH_URL: "http://localhost:3000"
+      STRIPE_SECRET_KEY: "sk_test_ci_placeholder"
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_ci_placeholder"
+      STRIPE_WEBHOOK_SECRET: "whsec_ci_placeholder"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      CRON_SECRET: "ci_placeholder_cron_secret"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run build
