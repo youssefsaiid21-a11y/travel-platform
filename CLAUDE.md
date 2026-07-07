@@ -140,10 +140,15 @@ land instead of letting it go stale the way the old scope note did.
   pre-existing nl-parser.ts reliability issue (see the earlier "Fix
   intermittent 'Could not parse flight search'" commit), not something this
   phase introduced, but it materially affects real usability of follow-ups.
-- **Phase 4 (process):** one nightly (not per-PR) smoke test against the
-  real deployed app's `/api/chat`, sandbox-only - the only thing that
-  would catch real Duffel/Z.AI schema drift, which the fully-mocked test
-  suite structurally cannot.
+- **Phase 4 (process) - DONE:** `.github/workflows/smoke-test.yml` runs
+  `scripts/smoke-test-chat.mjs` nightly (06:00 UTC) plus on manual dispatch -
+  a real POST to the deployed app's `/api/chat` (real Duffel sandbox call,
+  real Z.AI call), asserting a valid `done` event with offers. Deliberately
+  separate from `ci.yml` and not run per-PR - the only thing that would
+  catch real Duffel/Z.AI schema drift, which the fully-mocked test suite
+  structurally cannot, but too slow/costly/vendor-dependent to gate merges
+  on. `SMOKE_TEST_URL` repo variable overrides the default prod URL if the
+  deployment domain ever changes.
 - **Phase 5 (data model, timing driven by Sentry data, not fixed-last):**
   migrate `Booking.offerSnapshot`/`searchParams`/`passengerNames` and
   `TrackedSearch.passengers` from hand-serialized `String` JSON to native

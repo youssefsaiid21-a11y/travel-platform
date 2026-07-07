@@ -1,0 +1,25 @@
+name: Nightly smoke test
+
+# Deliberately separate from ci.yml and NOT run per-PR/push - this hits the
+# real deployed app (real Duffel sandbox call, real Z.AI call), which is
+# slow, costs real API calls, and its failure mode is "an external vendor
+# changed something," not something a PR author can fix by editing code.
+# See CLAUDE.md's Architecture Transformation Roadmap, Phase 4.
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: node scripts/smoke-test-chat.mjs
+        env:
+          SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL || 'https://travel-platform-ashy.vercel.app' }}

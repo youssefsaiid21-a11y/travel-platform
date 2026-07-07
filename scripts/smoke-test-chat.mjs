@@ -1,0 +1,76 @@
+#!/usr/bin/env node
+// Nightly-only sanity check against the REAL deployed app (Duffel sandbox,
+// real Z.AI call) - see CLAUDE.md's Architecture Transformation Roadmap,
+// Phase 4. Every other test in this repo mocks Prisma/Duffel/Stripe/the LLM
+// client, so this is the only layer that would catch real schema drift in
+// either of those two external APIs. Deliberately NOT run per-PR: it's slow,
+// costs real (sandbox) API calls, and its failure mode is "an external
+// vendor changed something," which a PR author can't fix by editing code.
+
+const APP_URL = process.env.SMOKE_TEST_URL ?? "https://travel-platform-ashy.vercel.app";
+
+function futureDateString(daysFromNow) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + daysFromNow);
+  return d.toISOString().slice(0, 10);
+}
+
+// Parses the exact SSE format src/app/api/chat/route.ts's `sse()` helper
+// produces (`event: <name>\ndata: <json>\n\n`) and returns the `done`
+// event's payload, mirroring the `readSSE` test helper used elsewhere.
+function parseDoneEvent(sseText) {
+  const lines = sseText.split("\n");
+  let currentEvent = "";
+  for (const line of lines) {
+    if (line.startsWith("event: ")) {
+      currentEvent = line.slice("event: ".length).trim();
+    } else if (line.startsWith("data: ") && currentEvent === "done") {
+      return JSON.parse(line.slice("data: ".length));
+    }
+  }
+  return null;
+}
+
+async function main() {
+  const departureDate = futureDateString(60);
+  const message = `Flights from London to New York on ${departureDate}`;
+
+  const res = await fetch(`${APP_URL}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Expected a 200 response, got ${res.status} ${res.statusText}`);
+  }
+
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("text/event-stream")) {
+    throw new Error(`Expected an SSE response, got content-type "${contentType}"`);
+  }
+
+  const body = await res.text();
+  const done = parseDoneEvent(body);
+  if (!done) {
+    throw new Error(`No "done" event in the SSE response:\n${body.slice(0, 2000)}`);
+  }
+  if (!done.session_id) {
+    throw new Error(`"done" event is missing session_id: ${JSON.stringify(done)}`);
+  }
+  if (done.search_failed) {
+    throw new Error(`Search reported as failed: "${done.reply}"`);
+  }
+  if (!Array.isArray(done.offers)) {
+    throw new Error(`"offers" is not an array: ${JSON.stringify(done.offers)}`);
+  }
+
+  console.log(
+    `OK - session ${done.session_id}, ${done.offers.length} offer(s), reply: "${(done.reply ?? "").slice(0, 100)}"`
+  );
+}
+
+main().catch((err) => {
+  console.error("Smoke test failed:", err instanceof Error ? err.message : err);
+  process.exit(1);
+});
