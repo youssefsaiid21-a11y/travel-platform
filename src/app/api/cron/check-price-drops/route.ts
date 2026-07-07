@@ -1,18 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { db } from "@/lib/db";
 import { checkTrackedSearchForPriceDrop } from "@/lib/priceTracking/checkPriceDrop";
 import { enforceRateLimit } from "@/lib/rate-limit";
-
-// A plain `!==` on a bearer token leaks timing information an attacker with
-// network access could use to guess it byte-by-byte; both sides must be the
-// same length before timingSafeEqual will even compare them.
-function isValidCronSecret(provided: string | null, expected: string): boolean {
-  if (!provided) return false;
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
+import { requireCronSecret } from "@/lib/cronAuth";
 
 // Batch job: re-checks every still-relevant TrackedSearch against Duffel and
 // fires a notification (via sendPriceDropAlert) for any that got cheaper.
@@ -24,15 +14,25 @@ function isValidCronSecret(provided: string | null, expected: string): boolean {
 //     matching CRON_SECRET.
 //   - or a GitHub Actions workflow on a `schedule:` trigger that curls this
 //     URL with the same shared secret header.
+//
+// No maxDuration was previously set, meaning this ran against whatever
+// Vercel's plan-based default ceiling is (as low as 10s on some plans) -
+// with real Duffel calls batched at 10-concurrent (see checkPriceDrop.ts),
+// total wall-clock time still scales with the tracked-search table size
+// even though concurrency is bounded. 60s is a conservative stopgap
+// supported on every Vercel plan; raise further (Pro/Enterprise support
+// more) if the table grows enough to need it. The correct long-term fix
+// once that happens is a real per-item queue, not a bigger number here or
+// self-pagination - a naive cursor breaks because checkTrackedSearchForPriceDrop
+// rewrites the very field (updatedAt) a cursor would sort on, and this cron
+// only runs once/day, so paginating across invocations would silently skip
+// rows rather than safely defer them. See CLAUDE.md's Architecture
+// Transformation Roadmap, Phase 1b.
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
-  if (process.env.NODE_ENV !== "test") {
-    const cronSecret = process.env.CRON_SECRET;
-    const authHeader = req.headers.get("authorization");
-    const provided = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    if (!cronSecret || !isValidCronSecret(provided, cronSecret)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const unauthorized = requireCronSecret(req);
+  if (unauthorized) return unauthorized;
 
   // Defense-in-depth alongside the CRON_SECRET check above - even in dev,
   // this is the most expensive operation in the app (one Duffel search per

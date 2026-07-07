@@ -5,7 +5,7 @@ import type { PriceCalendarEntry } from "@/lib/duffel/search";
 import { exploreDestinations } from "@/lib/duffel/explore";
 import { getOrCreate, save } from "@/lib/session/store";
 import { DuffelError } from "@/lib/duffel/client";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { enforceRateLimit, checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import type { NormalizedOffer } from "@/lib/duffel/types";
 import type { ExploreDestinationResult, ExploreParams, SearchParams } from "@/lib/parser/types";
 
@@ -108,6 +108,36 @@ export async function POST(req: NextRequest) {
             } satisfies ChatResponse);
             controller.close();
             return;
+          }
+
+          // "Explore anywhere" fans out ~26 real Duffel calls per message
+          // (one per POPULAR_DESTINATIONS entry) - disproportionately
+          // expensive versus a normal single-route search, on top of this
+          // route already being deliberately unauthenticated. A separate,
+          // tighter budget keyed by IP (not the general "chat" key already
+          // checked above) stops one client from burning through the
+          // Duffel-call budget via repeated explore-mode messages, without
+          // narrowing the normal search path's limit.
+          if (process.env.NODE_ENV !== "test") {
+            const exploreLimit = checkRateLimit(`explore:${getClientIp(req)}`, {
+              max: 3,
+              windowMs: 60_000,
+            });
+            if (!exploreLimit.ok) {
+              const reply = "Too many 'anywhere' searches - please wait a moment and try again.";
+              session.history.push({ role: "user", content: message.trim() });
+              session.history.push({ role: "assistant", content: reply });
+              await save(session);
+              push("done", {
+                session_id: session.id,
+                offers: [],
+                reply,
+                search_params: null,
+                search_failed: true,
+              } satisfies ChatResponse);
+              controller.close();
+              return;
+            }
           }
 
           push("status", {

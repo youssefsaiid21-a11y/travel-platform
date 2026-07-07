@@ -361,6 +361,44 @@ describe("POST /api/chat", () => {
     expect(vi.mocked(exploreDestinations)).not.toHaveBeenCalled();
   });
 
+  it("explore-anywhere mode: applies its own tighter rate limit, separate from the general chat limit", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    try {
+      const exploreRequest = () =>
+        makeRequest({ message: "Cheap flights from London this weekend, anywhere" });
+      for (let i = 0; i < 3; i++) {
+        mockCreate.mockResolvedValueOnce(
+          makeToolResponse({
+            origin: "LHR",
+            departure_date: "2026-09-01",
+            passengers: [{ type: "adult", count: 1 }],
+          })
+        );
+        vi.mocked(exploreDestinations).mockResolvedValueOnce([]);
+        const res = await POST(exploreRequest());
+        const body = await readSSE(res);
+        expect(body.search_failed).toBeFalsy();
+      }
+
+      // 4th explore-mode request in the same window is over budget (max: 3).
+      // nlParse must still succeed - the rate limit check happens after parsing.
+      mockCreate.mockResolvedValueOnce(
+        makeToolResponse({
+          origin: "LHR",
+          departure_date: "2026-09-01",
+          passengers: [{ type: "adult", count: 1 }],
+        })
+      );
+      const res = await POST(exploreRequest());
+      const body = await readSSE(res);
+      expect(body.search_failed).toBe(true);
+      expect(body.reply).toMatch(/too many/i);
+      expect(vi.mocked(exploreDestinations)).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("offer prices are raw strings from Duffel - no computed price in response", async () => {
     mockCreate.mockResolvedValueOnce(
       makeToolResponse({
