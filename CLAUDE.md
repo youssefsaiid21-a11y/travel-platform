@@ -114,10 +114,15 @@ land instead of letting it go stale the way the old scope note did.
   candidate (`updatedAt`) gets rewritten by the same write that records a
   check result, corrupting itself. Revisit when Sentry/prod metrics show
   the cron approaching its time ceiling, not on a calendar.
-- **Phase 2 (needs migration approval - shared prod DB):** JWT session
-  revocation via a `tokenVersion` column on `User`, checked in the
-  `session` callback - today a stolen session cookie survives a password
-  change for the full ~30-day default token lifetime.
+- **Phase 2 (code done, migration NOT yet applied to prod):** JWT session
+  revocation via a `tokenVersion` column on `User`, checked in the `jwt`
+  callback (not `session` - returning `null` from `jwt` is what next-auth
+  actually uses to invalidate a session; `session` runs too late to stop
+  a session body being produced). `change-password` increments it
+  atomically alongside the password hash. Migration file is written
+  (`prisma/migrations/20260707215113_user_token_version/`) but deliberately
+  NOT run against the shared production Neon DB yet - needs explicit
+  human approval, since local dev and prod share one database here.
 - **Phase 3 (UX):** an editable "here's what we understood" checkpoint in
   chat between the user's message and the real search firing - today a
   misparse only surfaces as wrong results, with no correctable moment.

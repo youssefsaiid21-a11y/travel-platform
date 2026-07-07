@@ -67,7 +67,11 @@ export async function POST(req: NextRequest) {
   const newHash = await bcrypt.hash(newPassword, 12);
   await db.user.update({
     where: { id: session.user.id },
-    data: { passwordHash: newHash },
+    // Bumping tokenVersion here (not in a separate call) is what actually
+    // revokes every other JWT issued before this point - see the jwt
+    // callback in src/auth.ts, which compares a session's baked-in
+    // tokenVersion against this column on every request.
+    data: { passwordHash: newHash, tokenVersion: { increment: 1 } },
   });
 
   return NextResponse.json({ ok: true });

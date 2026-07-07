@@ -104,8 +104,21 @@ describe("POST /api/auth/change-password", () => {
     expect(body.ok).toBe(true);
     expect(mockUpdate).toHaveBeenCalledWith({
       where: { id: MOCK_USER_ID },
-      data: { passwordHash: "$2b$12$hashed_new" },
+      data: { passwordHash: "$2b$12$hashed_new", tokenVersion: { increment: 1 } },
     });
+  });
+
+  it("bumps tokenVersion on password change - this is what revokes other sessions", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: MOCK_USER_ID } });
+    mockFindUnique.mockResolvedValueOnce({ passwordHash: "$2b$12$hashed_old" });
+    mockBcryptCompare.mockResolvedValueOnce(true);
+    mockBcryptHash.mockResolvedValueOnce("$2b$12$hashed_new");
+    mockUpdate.mockResolvedValueOnce({});
+
+    await POST(makeRequest({ currentPassword: "oldPass123", newPassword: "newPass456" }));
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ tokenVersion: { increment: 1 } }) })
+    );
   });
 
   it("hashes new password with cost factor 12", async () => {

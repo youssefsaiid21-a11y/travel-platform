@@ -12,6 +12,13 @@ model User {
   email            String           @unique
   name             String?
   passwordHash     String
+  // Bumped on password change. Compared against the value baked into a JWT
+  // at sign-in (see src/auth.ts's jwt callback) - a mismatch means the
+  // session predates the password change and must be treated as revoked,
+  // even though the JWT itself is still cryptographically valid until it
+  // expires. This is the one DB read per session-check the app's otherwise
+  // zero-DB-hit JWT strategy accepts, specifically to close that gap.
+  tokenVersion     Int              @default(0)
   createdAt        DateTime         @default(now())
   bookings         Booking[]
   passengerProfile PassengerProfile?
