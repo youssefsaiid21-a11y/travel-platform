@@ -205,6 +205,62 @@ describe("POST /api/chat", () => {
     expect(vi.mocked(searchWithFallback)).toHaveBeenCalledTimes(1);
   });
 
+  it("a stale confirmed_params (not matching the session's current checkpoint) doesn't overwrite a newer checkpoint's history slot", async () => {
+    // Checkpoint A: LHR -> JFK
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        destination: "JFK",
+        departure_date: "2026-09-01",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    const checkpointARes = await POST(makeRequest({ message: "LHR to JFK Sept 1" }));
+    const { session_id, params: paramsA } = await readSSEEvent<CheckpointEvent>(checkpointARes, "checkpoint");
+
+    // Edit before confirming: checkpoint B (LHR -> CDG) supersedes A in session.last_params
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        destination: "CDG",
+        departure_date: "2026-09-01",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    const checkpointBRes = await POST(makeRequest({ message: "actually Paris instead", session_id }));
+    const { params: paramsB } = await readSSEEvent<CheckpointEvent>(checkpointBRes, "checkpoint");
+    expect(paramsB.destination).toBe("CDG");
+
+    // Stale confirm: resumes checkpoint A's params, which no longer match
+    // session.last_params (B). Must still search (client-supplied params are
+    // honored), but must NOT splice its reply into checkpoint B's placeholder
+    // history slot.
+    const staleConfirmRes = await POST(
+      makeRequest({ message: "LHR to JFK Sept 1", session_id, confirmed_params: paramsA })
+    );
+    const staleDone = await readSSE(staleConfirmRes);
+    expect(staleDone.search_params?.destination).toBe("JFK");
+
+    // A subsequent follow-up's LLM call carries full history - if the stale
+    // confirm had wrongly overwritten checkpoint B's "...CDG..." placeholder
+    // reply, that text would be gone from history by now.
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        destination: "CDG",
+        departure_date: "2026-09-02",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    await POST(makeRequest({ message: "try the next day", session_id }));
+
+    const lastCall = mockCreate.mock.calls[mockCreate.mock.calls.length - 1][0] as {
+      messages: Array<{ role: string; content: string }>;
+    };
+    const historyText = lastCall.messages.map((m) => m.content).join(" | ");
+    expect(historyText).toContain("CDG");
+  });
+
   it("confirmed_params is still re-validated - a tampered/stale value can't skip validation", async () => {
     const res = await POST(
       makeRequest({

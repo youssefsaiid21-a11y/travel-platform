@@ -131,11 +131,12 @@ export function getClientIp(req: NextRequest): string {
 // bag/seat lookups) don't starve each other's quota.
 export async function enforceRateLimit(
   req: NextRequest,
-  routeKey: string
+  routeKey: string,
+  options?: { max?: number; windowMs?: number }
 ): Promise<NextResponse | null> {
   if (process.env.NODE_ENV === "test") return null;
 
-  const rl = await checkRateLimit(`${routeKey}:${getClientIp(req)}`);
+  const rl = await checkRateLimit(`${routeKey}:${getClientIp(req)}`, options);
   if (rl.ok) return null;
 
   return NextResponse.json(

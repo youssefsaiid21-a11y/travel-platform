@@ -42,4 +42,16 @@ describe("enforceRateLimit", () => {
     expect(res!.status).toBe(429);
     expect(res!.headers.get("Retry-After")).toBeTruthy();
   });
+
+  it("respects an explicit max/windowMs override instead of the default budget", async () => {
+    const ip = "203.0.113.20";
+    for (let i = 0; i < 16; i++) {
+      expect(
+        await enforceRateLimit(makeRequest(ip), "chat", { max: 16, windowMs: 60_000 })
+      ).toBeNull();
+    }
+    expect(
+      await enforceRateLimit(makeRequest(ip), "chat", { max: 16, windowMs: 60_000 })
+    ).not.toBeNull();
+  });
 });

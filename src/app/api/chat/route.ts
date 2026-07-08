@@ -54,7 +54,12 @@ function sse(event: string, data: object): string {
 }
 
 export async function POST(req: NextRequest) {
-  const rateLimited = await enforceRateLimit(req, "chat");
+  // Doubled from the default 8/60s: the checkpoint step (see below) splits
+  // one logical search into two requests (checkpoint + confirm), so the
+  // same effective per-minute search budget as before Phase 3 now needs
+  // roughly double the raw request budget. An edit before confirming costs
+  // one more request still, which is fair - it's genuinely extra parse work.
+  const rateLimited = await enforceRateLimit(req, "chat", { max: 16, windowMs: 60_000 });
   if (rateLimited) return rateLimited;
 
   let body: ChatRequest;
@@ -78,32 +83,43 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(sse(event, data)));
       };
 
-      // The user's turn was already recorded in history when the checkpoint
-      // was first shown (see the checkpoint push below) - don't record it
-      // again when they come back having confirmed it, or history would
-      // have the same message twice.
-      const recordUserTurn = (session: Awaited<ReturnType<typeof getOrCreate>>) => {
-        if (!confirmed_params) {
-          session.history.push({ role: "user", content: message.trim() });
-        }
-      };
-
-      // Same idea for the assistant side: a confirmed request's turn already
-      // has a placeholder assistant reply from when the checkpoint was shown
-      // (the "here's what I understood" summary) - replace it with the real
-      // reply instead of pushing a second assistant turn back to back, which
-      // would break the strict user/assistant alternation nlParse's
-      // follow-up context relies on for the next message.
-      const recordAssistantReply = (session: Awaited<ReturnType<typeof getOrCreate>>, content: string) => {
-        if (confirmed_params && session.history.at(-1)?.role === "assistant") {
-          session.history[session.history.length - 1] = { role: "assistant", content };
-        } else {
-          session.history.push({ role: "assistant", content });
-        }
-      };
-
       try {
         const session = await getOrCreate(session_id);
+
+        // True only when confirmed_params exactly matches what the most
+        // recently shown checkpoint for THIS session actually parsed - not
+        // just "confirmed_params is present." Guards against a stale or
+        // replayed confirm (e.g. confirming an old checkpoint after already
+        // typing a newer edit) silently overwriting the wrong checkpoint's
+        // placeholder history entry - a mismatch is instead treated as its
+        // own fresh turn, appended rather than spliced into an unrelated slot.
+        const confirmsPendingCheckpoint =
+          !!confirmed_params &&
+          JSON.stringify(confirmed_params) === JSON.stringify(session.last_params);
+
+        // The user's turn was already recorded in history when the checkpoint
+        // was first shown (see the checkpoint push below) - don't record it
+        // again when they come back having confirmed it, or history would
+        // have the same message twice.
+        const recordUserTurn = () => {
+          if (!confirmsPendingCheckpoint) {
+            session.history.push({ role: "user", content: message.trim() });
+          }
+        };
+
+        // Same idea for the assistant side: confirming the pending checkpoint
+        // means this turn already has a placeholder assistant reply from when
+        // the checkpoint was shown (the "here's what I understood" summary) -
+        // replace it with the real reply instead of pushing a second
+        // assistant turn back to back, which would break the strict
+        // user/assistant alternation nlParse's follow-up context relies on.
+        const recordAssistantReply = (content: string) => {
+          if (confirmsPendingCheckpoint && session.history.at(-1)?.role === "assistant") {
+            session.history[session.history.length - 1] = { role: "assistant", content };
+          } else {
+            session.history.push({ role: "assistant", content });
+          }
+        };
 
         let params: SearchParams | null;
         let error: string | null = null;
@@ -241,8 +257,8 @@ export async function POST(req: NextRequest) {
         // ── Step 2: validate ───────────────────────────────────────────
         const validationError = validateParams(params);
         if (validationError) {
-          recordUserTurn(session);
-          recordAssistantReply(session, validationError);
+          recordUserTurn();
+          recordAssistantReply(validationError);
           await save(session);
           push("done", {
             session_id: session.id,
@@ -328,8 +344,8 @@ export async function POST(req: NextRequest) {
 
         if (searchError) {
           const reply = searchError;
-          recordUserTurn(session);
-          recordAssistantReply(session, reply);
+          recordUserTurn();
+          recordAssistantReply(reply);
           await save(session);
           push("done", {
             session_id: session.id,
@@ -376,8 +392,8 @@ export async function POST(req: NextRequest) {
           ),
         ]);
 
-        recordUserTurn(session);
-        recordAssistantReply(session, reply);
+        recordUserTurn();
+        recordAssistantReply(reply);
         session.last_params = usedParams;
         session.last_offers = offers;
         await save(session);
