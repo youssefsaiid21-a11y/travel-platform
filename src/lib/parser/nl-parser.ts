@@ -236,12 +236,18 @@ export async function nlParse(
   // The retry loop below is a second layer for the cases forcing tool_choice
   // doesn't cover: some OpenAI-compatible proxies don't enforce "required"
   // 100% of the time, and a model can still return malformed JSON in
-  // function.arguments. One retry, not a loop, so a genuinely broken
-  // request still fails fast instead of hanging.
+  // function.arguments. Bounded at 3 attempts (not a loop), so a genuinely
+  // broken request still fails fast instead of hanging - bumped from 2 after
+  // real usage showed occasional back-to-back "no tool call" responses that
+  // exhausted the original single retry; isolated repeated testing against
+  // the real API couldn't reproduce it on demand, consistent with a
+  // transient burst in the model/proxy's tool-call enforcement rather than
+  // something deterministic about any particular prompt shape.
+  const MAX_ATTEMPTS = 3;
   let toolCallName: string | null = null;
   let input: Record<string, unknown> | null = null;
   let lastFailureReason = "";
-  for (let attempt = 0; attempt < 2 && !input; attempt++) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS && !input; attempt++) {
     const response = await client.chat.completions.create({
       model: MODEL,
       messages,
@@ -263,7 +269,7 @@ export async function nlParse(
   }
 
   if (!input || !toolCallName) {
-    console.error(`nlParse: giving up after 2 attempts (${lastFailureReason})`);
+    console.error(`nlParse: giving up after ${MAX_ATTEMPTS} attempts (${lastFailureReason})`);
     return { params: null, error: "Could not parse flight search from your message.", answer: null, exploreParams: null };
   }
 

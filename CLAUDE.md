@@ -132,14 +132,17 @@ land instead of letting it go stale the way the old scope note did.
   with two consecutive "user" role messages (violates strict role
   alternation) - fixed by recording a placeholder assistant reply at
   checkpoint time and replacing it with the real reply once confirmed.
-  Separately (NOT fixed here, flagged for its own follow-up): manual
-  testing against the real Z.AI model found that ANY follow-up message
-  (checkpoint-edit or a normal completed-search follow-up, e.g. "make it
-  business class") reproducibly fails to return a tool call once the
-  "[Previous search parameters: ...]" context is injected - this is a
-  pre-existing nl-parser.ts reliability issue (see the earlier "Fix
-  intermittent 'Could not parse flight search'" commit), not something this
-  phase introduced, but it materially affects real usability of follow-ups.
+  Follow-up investigation of a flagged reliability issue (manual browser
+  testing had seen follow-up messages repeatedly fail to get a tool call
+  back from Z.AI): calling the real `nlParse()` directly, both serially and
+  concurrently (18 total real API calls with the same message/history
+  shape that failed live), reproduced ZERO failures - this was not a
+  deterministic bug tied to the "[Previous search parameters: ...]"
+  injection or any particular prompt shape, it was a transient burst in
+  Z.AI's tool-call reliability during that testing window. As a modest,
+  evidence-based hardening (real usage did see the existing single retry
+  get exhausted back-to-back), bumped `nlParse`'s retry bound from 2 to 3
+  attempts, with a test covering the retry loop actually retrying.
   An independent review pass afterward caught two more real issues, both
   fixed in the same session: (1) a stale/replayed `confirmed_params` could
   overwrite the WRONG checkpoint's placeholder history slot if the user had

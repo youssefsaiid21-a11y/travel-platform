@@ -380,6 +380,48 @@ describe("nlParse - 10 NL query fixtures", () => {
   });
 });
 
+function makeNoToolCallResponse() {
+  return { choices: [{ message: { tool_calls: [] } }] };
+}
+
+describe("nlParse - retry loop for a model that skips the tool call", () => {
+  beforeEach(() => {
+    mockCreate.mockReset();
+  });
+
+  // Real usage showed occasional back-to-back "no tool call" responses from
+  // the model despite tool_choice: "required" - this asserts the retry loop
+  // actually retries up to its bound (currently 3 attempts) rather than
+  // giving up after just one.
+  it("succeeds if the 3rd attempt finally returns a real tool call", async () => {
+    mockCreate.mockResolvedValueOnce(makeNoToolCallResponse());
+    mockCreate.mockResolvedValueOnce(makeNoToolCallResponse());
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        destination: "JFK",
+        departure_date: "2026-09-01",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+
+    const { params, error } = await nlParse("London to New York September 1st", [], null);
+
+    expect(mockCreate).toHaveBeenCalledTimes(3);
+    expect(error).toBeNull();
+    expect(params?.origin).toBe("LHR");
+  });
+
+  it("gives up with a friendly error after exhausting all attempts", async () => {
+    mockCreate.mockResolvedValue(makeNoToolCallResponse());
+
+    const { params, error } = await nlParse("London to New York September 1st", [], null);
+
+    expect(params).toBeNull();
+    expect(error).toBe("Could not parse flight search from your message.");
+  });
+});
+
 describe("nlParse - explore anywhere (destination omitted)", () => {
   beforeEach(() => {
     mockCreate.mockReset();
