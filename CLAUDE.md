@@ -140,15 +140,27 @@ land instead of letting it go stale the way the old scope note did.
   pre-existing nl-parser.ts reliability issue (see the earlier "Fix
   intermittent 'Could not parse flight search'" commit), not something this
   phase introduced, but it materially affects real usability of follow-ups.
+  An independent review pass afterward caught two more real issues, both
+  fixed in the same session: (1) a stale/replayed `confirmed_params` could
+  overwrite the WRONG checkpoint's placeholder history slot if the user had
+  since edited to a newer checkpoint - fixed by only replacing in place
+  when `confirmed_params` matches `session.last_params`, otherwise
+  appending as its own turn; (2) splitting one logical search into two
+  requests doubled `/api/chat`'s effective request cost, so its rate limit
+  was bumped from the default 8/60s to 16/60s to compensate.
 - **Phase 4 (process) - DONE:** `.github/workflows/smoke-test.yml` runs
   `scripts/smoke-test-chat.mjs` nightly (06:00 UTC) plus on manual dispatch -
-  a real POST to the deployed app's `/api/chat` (real Duffel sandbox call,
-  real Z.AI call), asserting a valid `done` event with offers. Deliberately
-  separate from `ci.yml` and not run per-PR - the only thing that would
-  catch real Duffel/Z.AI schema drift, which the fully-mocked test suite
-  structurally cannot, but too slow/costly/vendor-dependent to gate merges
-  on. `SMOKE_TEST_URL` repo variable overrides the default prod URL if the
-  deployment domain ever changes.
+  drives the full checkpoint->confirm round trip against the deployed app's
+  `/api/chat` (real Duffel sandbox call, real Z.AI call), asserting a valid
+  `done` event with offers. Deliberately separate from `ci.yml` and not run
+  per-PR - the only thing that would catch real Duffel/Z.AI schema drift,
+  which the fully-mocked test suite structurally cannot, but too
+  slow/costly/vendor-dependent to gate merges on. `SMOKE_TEST_URL` repo
+  variable overrides the default prod URL if the deployment domain ever
+  changes. (An independent review caught that the first version of this
+  script predated the Phase 3 checkpoint gate and would have failed on
+  every single nightly run, not just on real drift - fixed before this
+  was ever relied on.)
 - **Phase 5 (code done, migration NOT yet applied to prod):** migrated
   `Booking.offerSnapshot`/`searchParams`/`passengerNames` and
   `TrackedSearch.passengers` from hand-serialized `String` JSON to native
