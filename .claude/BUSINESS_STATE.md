@@ -6,18 +6,41 @@ it in the same turn a decision worth remembering gets made, not "later."
 
 ## Go-live checklist progress (2026-07-09)
 Founder triaged the full go-live checklist (see local `docs/go-live-checklist.md`,
-gitignored - sensitive). Fixed and deployed to production this pass:
-item 1 ($5 flat service fee - first real revenue mechanism), item 4
-(passport-number field-level encryption + account deletion/data export),
-item 5 (cookie consent banner gating the attribution cookie), item 8/9/10
-partially (Stripe live-key code gate added, item 12), item 13 (npm audit
-fixed via a postcss override, not a next downgrade), item 17 (TOTP 2FA +
-backup codes), item 18 (see below - documented, not yet fully addressed).
-Deferred per founder's explicit call: items 2 (refunds), 3 (legal pages),
-6 (licensing), 11 (Duffel/Stripe account-level steps), 15 (custom domain).
-Still open: items 8/9/14 (Resend/Sentry/uptime - need founder decision on
-credentials), 16 (reconciliation, in progress), 7 (Vercel Pro purchase
-decision, not yet asked).
+gitignored - sensitive) and the following shipped to production this pass,
+each with real browser verification and/or a booking-safety-reviewer pass
+where it touched money code:
+- **Item 1**: flat $5 service fee (`src/lib/pricing.ts`) - the business's
+  first real revenue mechanism, was a pure zero-margin passthrough before.
+- **Item 4**: passport-number field-level encryption (`src/lib/crypto.ts`,
+  AES-256-GCM) + account deletion (anonymize, keep Booking history for
+  accounting) + GDPR-style data export.
+- **Item 5**: cookie consent banner, gates the `orbi_channel` attribution
+  cookie.
+- **Item 10**: support tickets now alert the founder by email (was silent).
+- **Item 12**: Stripe live-key code gate, mirrors the existing Duffel one.
+- **Item 13**: npm audit fixed via a `postcss` override (not a `next`
+  downgrade - `npm audit fix --force` suggested `next@9.3.3`, nonsensical).
+- **Item 14**: daily site-health cron + email alert - explicitly documented
+  as a daily digest, not real-time uptime monitoring (Vercel Hobby cron
+  frequency limit).
+- **Item 16**: financial reconciliation (`scripts/reconcile-finances.mjs`,
+  `src/lib/reconciliation.ts`) - real margin vs. Duffel cost, by currency.
+- **Item 17**: TOTP 2FA + single-use backup codes, verified end-to-end
+  including a real login with a backup code and confirming its removal.
+- **Item 18**: documented in `docs/disaster-recovery.md` (gitignored) -
+  Neon's actual plan/PITR retention isn't independently verified (no
+  console access), flagged for the founder to check directly.
+
+**Deferred per founder's explicit call** (not started): items 2 (refunds),
+3 (legal pages), 6 (licensing), 11 (Duffel/Stripe account-level steps),
+15 (custom domain).
+
+**Still genuinely open:**
+- Items 8/9 (Resend + Sentry) - founder is creating both accounts and will
+  paste the API key/DSN; code paths (`sendAlertEmail`, notification infra)
+  are already built and waiting on `RESEND_API_KEY`/`ALERT_EMAIL`/`SENTRY_DSN`.
+- Item 7 (Vercel Pro) - founder said not yet; Hobby plan's commercial-use
+  ToS restriction remains unresolved until a real launch date approaches.
 
 ## North-star metrics
 Vercel Analytics stood up 2026-07-09 (`search_completed`, `offer_selected`,
