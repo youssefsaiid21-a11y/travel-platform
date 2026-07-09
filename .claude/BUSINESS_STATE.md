@@ -17,15 +17,45 @@ exists and will populate from here on.
 | Agent | Status | Notes |
 |---|---|---|
 | Operations | active | `.claude/agents/operations-agent.md` - read-only infra/health watcher |
-| SEO | built, first pass run | `.claude/agents/seo-agent.md` - PR #2 (`agents/seo-first-pass`), open for review |
-| GEO | built, first pass run | `.claude/agents/geo-agent.md` - PR #1 (`agents/geo-first-pass`), open for review |
-| Content & Virality | built, first pass run | `.claude/agents/content-virality-agent.md` - PR #3 (`agents/content-virality-first-pass`), open for review |
-| Channel Coverage | built, first pass run | `.claude/agents/channel-coverage-agent.md` - PR #4 (`agents/channel-coverage-first-pass`), open for review |
-| Finance | drafted, NOT activated | `.claude/agents/finance-agent.md` - read-only by design; needs explicit founder review of this exact prompt before first real run |
-| Customer Support | agent defined, feature blocked | `.claude/agents/customer-support-agent.md` written (draft-only, never auto-sends); `/support` page + API route built on `main`, non-functional until the SupportTicket migration is approved |
-| Paid Ads | drafted, NOT activated | `.claude/agents/paid-ads-agent.md` - no live write access designed in; needs a founder budget decision + prompt review before first real run |
+| SEO | merged to `main`, live | `.claude/agents/seo-agent.md` - PR #2 merged |
+| GEO | merged to `main`, live | `.claude/agents/geo-agent.md` - PR #1 merged |
+| Content & Virality | merged to `main`, live | `.claude/agents/content-virality-agent.md` - PR #3 merged |
+| Channel Coverage | merged to `main`, live | `.claude/agents/channel-coverage-agent.md` - PR #4 merged |
+| Finance | drafted, NOT activated | `.claude/agents/finance-agent.md` - read-only by design; prompt reviewed 2026-07-09, still needs an explicit go-ahead for first real run |
+| Customer Support | agent defined, feature LIVE | `.claude/agents/customer-support-agent.md` written (draft-only, never auto-sends); `/support` page + API route live in production, SupportTicket migration applied and verified end-to-end |
+| Paid Ads | drafted, NOT activated | `.claude/agents/paid-ads-agent.md` - no live write access designed in; still needs a founder budget decision + prompt sign-off before first real run |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-09: Reconciled the 4 marketing-agent branches properly after
+  founder feedback that parallel-agent quality was subpar. Root cause
+  confirmed with hard evidence: SEO and Content & Virality had both
+  independently rewritten `sitemap.ts` (one would have silently reverted
+  the other's live-domain fix and dropped its URLs); GEO and Channel
+  Coverage had both independently rewritten `layout.tsx` (one would have
+  reverted the other's JSON-LD/corrected airline-count stat). Documented
+  the fix as a permanent "Parallel Agent Protocol" in `CLAUDE.md`
+  (foundation-before-fan-out, data-file extension over hub-file editing,
+  rebase-before-merge, integration-level testing, worktree cleanup
+  discipline). Then executed the merge properly: SEO -> GEO -> Content &
+  Virality -> Channel Coverage, each rebased onto the previous merge (not
+  the stale fork point) before merging, with the `sitemap.ts` conflict
+  resolved by hand (kept both flight-guide and content-guide entries plus
+  the domain fix) and the full test suite re-run after every merge. Found
+  and fixed 2 real display bugs during the post-merge browser verification
+  pass that no automated test caught: a duplicated airport code
+  ("Heathrow (LHR) (LHR)") and an ambiguous-looking missing space in a CTA
+  button. All 4 PRs merged and closed; their branches deleted (local +
+  remote) once merged.
+  Then, with explicit founder approval, applied the `SupportTicket`
+  migration to the production Neon DB and verified the full flow live
+  (filled and submitted the real `/support` form against production,
+  got the real success state - not just a code-level check) before
+  promoting the final build to production.
+  Judgment call surfaced and correctly deferred by a subagent mid-session:
+  "1,2,3 approved" was ambiguous between "merge PRs #1-4" (item 1, bundled)
+  and literally "PRs #1/#2/#3 only" - asked rather than guessed, since a
+  wrong guess either way meant either an unauthorized merge or leaving a
+  clean, tested PR needlessly stuck.
 - 2026-07-09: Full business-ops build-out session, capped with a production
   deploy of everything merged to `main`. Summary of what shipped:
   (1) Vercel Analytics + funnel tracking; (2) Customer Support intake code
@@ -100,22 +130,6 @@ exists and will populate from here on.
   agent stood up as the first functional agent in the roster.
 
 ## Open escalations (nothing autonomous can resolve without founder input)
-- **SupportTicket migration not yet applied to production Neon DB.** Written
-  by hand (`prisma/migrations/20260709103842_support_ticket/`), purely
-  additive (CREATE TABLE only, no ALTER of existing tables), but this repo's
-  established convention requires explicit founder approval before any
-  `prisma migrate deploy` against the shared prod DB. The harness's
-  self-modification classifier also blocked an attempt to pre-authorize
-  future *additive-only* migrations as autonomous - that specific widening
-  needs the founder's exact-text sign-off, same as any other autoMode change.
-  Until approved, `/support` and `/api/support-tickets` are code-complete but
-  non-functional in production.
-- **4 marketing agents' first-pass work is sitting on unmerged branches**,
-  per the Charter's propose-only/no-auto-merge rule for SEO, GEO,
-  Content & Virality, and Channel Coverage: `agents/seo-first-pass`,
-  `agents/geo-first-pass`, `agents/content-virality-first-pass`,
-  `agents/channel-coverage-first-pass`. Needs founder review before merging
-  to `main` (or explicit instruction to merge them directly).
 - **Finance and Paid Ads agents are drafted but not activated** - both
   prompts are written with hard escalation gates built in, but per
   `.claude/settings.json`, a general "keep going" instruction does not cover
@@ -123,6 +137,7 @@ exists and will populate from here on.
   (`.claude/agents/finance-agent.md`, `.claude/agents/paid-ads-agent.md`)
   before either is ever actually run. Paid Ads additionally needs an
   explicit budget decision first.
-- Customer Support agent definition itself (`.claude/agents/customer-support-agent.md`)
-  hasn't been written yet - lower priority than the migration gate above,
-  since the feature can't go live without the migration regardless.
+- `flightGuides.ts`'s FAQ content (now live via the merged SEO PR) makes
+  visa/entry-requirement claims (e.g. UK->US ESTA) - already hedged
+  ("requirements change, always check current rules") but still worth a
+  founder read given the Charter's legal/policy-claim escalation category.
