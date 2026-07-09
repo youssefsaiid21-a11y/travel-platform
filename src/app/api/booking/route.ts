@@ -279,6 +279,7 @@ export async function POST(req: NextRequest) {
 
   track("booking_completed", {
     status,
+    channel: req.cookies.get("orbi_channel")?.value ?? "direct",
     totalCurrency: offer.total_currency,
     totalAmount: offer.total_amount,
   }).catch(() => {});

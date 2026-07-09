@@ -17,7 +17,10 @@ export const metadata: Metadata = {
     siteName: "Orbi",
   },
   twitter: {
-    card: "summary",
+    // "summary_large_image" is the right card type now that a real
+    // opengraph-image.tsx exists (src/app/opengraph-image.tsx) - "summary"
+    // renders a small square thumbnail even when a large image is available.
+    card: "summary_large_image",
     title: "Orbi - AI Flight Search",
     description: "Search and book flights from 300+ airlines using plain English.",
   },

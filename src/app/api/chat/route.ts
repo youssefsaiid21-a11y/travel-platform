@@ -403,6 +403,7 @@ export async function POST(req: NextRequest) {
           offerCount: offers.length,
           origin: usedParams.origin,
           destination: usedParams.destination,
+          channel: req.cookies.get("orbi_channel")?.value ?? "direct",
         }).catch(() => {});
 
         push("done", {

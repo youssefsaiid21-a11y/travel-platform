@@ -59,6 +59,19 @@ export default auth((req) => {
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
+
+  // First-touch channel attribution (Channel Coverage agent's mandate: know
+  // which acquisition channel is actually driving traffic). Only set on
+  // first visit - a later utm_source-less page view shouldn't overwrite the
+  // channel that originally brought this visitor in.
+  const utmSource = req.nextUrl.searchParams.get("utm_source");
+  if (utmSource && !req.cookies.get("orbi_channel")) {
+    response.cookies.set("orbi_channel", utmSource, {
+      maxAge: 60 * 60 * 24 * 30,
+      sameSite: "lax",
+    });
+  }
+
   return response;
 });
 

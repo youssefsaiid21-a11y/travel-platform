@@ -9,6 +9,7 @@ import type {
   NormalizedService,
 } from "@/lib/duffel/types";
 import { layoverMinutes, formatLayover } from "@/lib/duffel/layover";
+import { getChannelCookie } from "@/lib/channel";
 import { BagIcon, SeatIcon, PlaneIcon } from "./icons";
 import styles from "./OfferCard.module.css";
 
@@ -635,6 +636,7 @@ export function OfferCard({
                   airline: offer.owner.name,
                   amount: offer.total_amount,
                   currency: offer.total_currency,
+                  channel: getChannelCookie(),
                 });
                 onSelect(offer);
               } catch (err) {
