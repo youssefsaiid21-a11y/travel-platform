@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getBaseUrl } from "@/lib/site";
 import { FLIGHT_GUIDES } from "@/lib/flightGuides";
+import { GUIDES } from "@/lib/guides";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = getBaseUrl();
@@ -14,6 +15,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: "monthly" as const,
       priority: 0.7,
+    })),
+    { url: `${base}/guides`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.6 },
+    ...GUIDES.map((g) => ({
+      url: `${base}/guides/${g.slug}`,
+      lastModified: new Date(),
+      changeFrequency: "monthly" as const,
+      priority: 0.5,
     })),
   ];
 }

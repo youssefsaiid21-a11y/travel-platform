@@ -18,6 +18,12 @@ export default function NavBar() {
       </Link>
       <div className={styles.right}>
         <Link
+          href="/guides"
+          className={`${styles.link} ${pathname?.startsWith("/guides") ? styles.linkActive : ""}`}
+        >
+          Guides
+        </Link>
+        <Link
           href="/support"
           className={`${styles.link} ${pathname === "/support" ? styles.linkActive : ""}`}
         >
