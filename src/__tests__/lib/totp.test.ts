@@ -48,14 +48,14 @@ describe("verifyTotp", () => {
     // RFC 6238's published 8-digit code at T=59s is 94287082; this app only
     // ever produces 6-digit codes (truncated the same way authenticator
     // apps commonly display), i.e. 94287082 % 1_000_000 = 287082.
-    expect(verifyTotp(base32Key, "287082")).toBe(true);
-    expect(verifyTotp(base32Key, "000000")).toBe(false);
+    expect(verifyTotp(base32Key, "287082").valid).toBe(true);
+    expect(verifyTotp(base32Key, "000000").valid).toBe(false);
   });
 
   it("rejects a non-6-digit token", () => {
     const secret = generateTotpSecret();
-    expect(verifyTotp(secret, "12345")).toBe(false);
-    expect(verifyTotp(secret, "abcdef")).toBe(false);
+    expect(verifyTotp(secret, "12345").valid).toBe(false);
+    expect(verifyTotp(secret, "abcdef").valid).toBe(false);
   });
 
   it("accepts a code from one time-step in the past (clock drift tolerance)", () => {
@@ -63,7 +63,7 @@ describe("verifyTotp", () => {
     const codeAtStepZero = totpAtCounter(secret, 0);
     vi.useFakeTimers();
     vi.setSystemTime(new Date(30 * 1000)); // one 30s step after counter 0
-    expect(verifyTotp(secret, codeAtStepZero)).toBe(true);
+    expect(verifyTotp(secret, codeAtStepZero).valid).toBe(true);
   });
 
   it("rejects a code from far outside the drift window", () => {
@@ -71,7 +71,22 @@ describe("verifyTotp", () => {
     const codeAtStepZero = totpAtCounter(secret, 0);
     vi.useFakeTimers();
     vi.setSystemTime(new Date(10 * 60 * 1000)); // 10 minutes later
-    expect(verifyTotp(secret, codeAtStepZero)).toBe(false);
+    expect(verifyTotp(secret, codeAtStepZero).valid).toBe(false);
+  });
+
+  it("returns the matched time step alongside valid: true, for replay-protection callers", () => {
+    // Counter 1 (not 0) deliberately - the drift check below tries
+    // counter-1, and a counter of 0 would make that negative, which
+    // BigInt-based counters can't represent (see hotp()). Real systems
+    // never run anywhere near the Unix epoch, so this isn't a scenario
+    // worth handling in the implementation - just avoided in the fixture.
+    const secret = generateTotpSecret();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(30 * 1000));
+    const code = totpAtCounter(secret, 1);
+    const result = verifyTotp(secret, code);
+    expect(result.valid).toBe(true);
+    expect(result.step).toBe(1);
   });
 });
 

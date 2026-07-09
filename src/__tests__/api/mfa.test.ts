@@ -71,16 +71,16 @@ beforeEach(() => {
 describe("POST /api/auth/mfa/setup", () => {
   it("returns 401 when unauthenticated", async () => {
     mockAuth.mockResolvedValueOnce(null);
-    const res = await setupPOST();
+    const res = await setupPOST(makeRequest("/api/auth/mfa/setup", {}));
     expect(res.status).toBe(401);
   });
 
-  it("generates and stores a secret, without enabling MFA yet", async () => {
+  it("generates and stores a secret with no password required, when MFA isn't enabled yet", async () => {
     mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
-    mockFindUnique.mockResolvedValueOnce({ email: "jane@example.com" });
+    mockFindUnique.mockResolvedValueOnce({ email: "jane@example.com", totpEnabled: false });
     mockUpdate.mockResolvedValueOnce({});
 
-    const res = await setupPOST();
+    const res = await setupPOST(makeRequest("/api/auth/mfa/setup", {}));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.secret).toMatch(/^[A-Z2-7]+$/);
@@ -89,6 +89,48 @@ describe("POST /api/auth/mfa/setup", () => {
       where: { id: USER_ID },
       data: expect.objectContaining({ totpSecret: body.secret, totpEnabled: false }),
     });
+  });
+
+  it("requires a password to re-enroll when MFA is already enabled (prevents a stolen session silently disabling it)", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockFindUnique.mockResolvedValueOnce({
+      email: "jane@example.com",
+      totpEnabled: true,
+      passwordHash: await bcrypt.hash("correct", 4),
+    });
+
+    const res = await setupPOST(makeRequest("/api/auth/mfa/setup", {}));
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects re-enrollment with an incorrect password when MFA is already enabled", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockFindUnique.mockResolvedValueOnce({
+      email: "jane@example.com",
+      totpEnabled: true,
+      passwordHash: await bcrypt.hash("correct", 4),
+    });
+
+    const res = await setupPOST(makeRequest("/api/auth/mfa/setup", { password: "wrong" }));
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("allows re-enrollment with the correct password when MFA is already enabled", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockFindUnique.mockResolvedValueOnce({
+      email: "jane@example.com",
+      totpEnabled: true,
+      passwordHash: await bcrypt.hash("correct", 4),
+    });
+    mockUpdate.mockResolvedValueOnce({});
+
+    const res = await setupPOST(makeRequest("/api/auth/mfa/setup", { password: "correct" }));
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ totpEnabled: false }) })
+    );
   });
 });
 

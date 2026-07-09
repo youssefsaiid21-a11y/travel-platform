@@ -60,18 +60,29 @@ function hotp(key: Buffer, counter: number): string {
   return (code % 1_000_000).toString().padStart(6, "0");
 }
 
+export interface TotpVerification {
+  valid: boolean;
+  // The matched time step, present only when valid - callers that need
+  // replay protection (see User.totpLastUsedStep) compare this against
+  // the last step that was actually accepted for this user, since a bare
+  // "valid: true" alone would let the same code be reused repeatedly for
+  // its whole ~90s validity window.
+  step?: number;
+}
+
 // Checks the current time step plus one step on either side (±30s) to
 // tolerate normal clock drift between the server and the authenticator app -
 // standard practice, not a security weakening (still a 90-second window on
 // a 6-digit code, same order of magnitude as a single 30s-only check).
-export function verifyTotp(secret: string, token: string): boolean {
-  if (!/^\d{6}$/.test(token)) return false;
+export function verifyTotp(secret: string, token: string): TotpVerification {
+  if (!/^\d{6}$/.test(token)) return { valid: false };
   const key = base32Decode(secret);
   const counter = Math.floor(Date.now() / 1000 / STEP_SECONDS);
   for (let drift = -1; drift <= 1; drift++) {
-    if (hotp(key, counter + drift) === token) return true;
+    const step = counter + drift;
+    if (hotp(key, step) === token) return { valid: true, step };
   }
-  return false;
+  return { valid: false };
 }
 
 // Single-use recovery codes for when the authenticator device is

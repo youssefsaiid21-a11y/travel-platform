@@ -26,6 +26,12 @@ model User {
   // can never lock someone out.
   totpSecret       String?
   totpEnabled      Boolean          @default(false)
+  // The TOTP time-step last accepted for this user (see src/lib/totp.ts's
+  // verifyTotp - each 30s step is a distinct counter value). Without this,
+  // the same valid 6-digit code could be replayed repeatedly for its whole
+  // ~90s validity window (the ±1-step clock-drift tolerance) - checked and
+  // updated in src/lib/authorizeCredentials.ts on every login attempt.
+  totpLastUsedStep Int?
   // Array of bcrypt-hashed single-use recovery codes, shown to the user
   // once at enrollment time and never retrievable again. A code is removed
   // from this array the moment it's used (src/auth.ts's authorize()).

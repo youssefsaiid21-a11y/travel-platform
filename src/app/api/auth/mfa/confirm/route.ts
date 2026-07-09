@@ -40,7 +40,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!verifyTotp(user.totpSecret, body.code.trim())) {
+  const verification = verifyTotp(user.totpSecret, body.code.trim());
+  if (!verification.valid) {
     return NextResponse.json({ error: "Incorrect code." }, { status: 400 });
   }
 
@@ -49,7 +50,13 @@ export async function POST(req: NextRequest) {
 
   await db.user.update({
     where: { id: session.user.id },
-    data: { totpEnabled: true, backupCodes: hashedCodes },
+    data: {
+      totpEnabled: true,
+      backupCodes: hashedCodes,
+      // Records this confirmation code as already-used so it can't also be
+      // replayed as the user's first login attempt.
+      totpLastUsedStep: verification.step,
+    },
   });
 
   return NextResponse.json({ ok: true, backupCodes });

@@ -42,7 +42,11 @@ export async function authorizeCredentials(
     const otp = (credentials.otp as string | undefined)?.trim();
     if (!otp) throw new MfaRequiredError();
 
-    const validTotp = user.totpSecret ? verifyTotp(user.totpSecret, otp) : false;
+    const totpResult = user.totpSecret ? verifyTotp(user.totpSecret, otp) : { valid: false };
+    // A code is only accepted once - without this, the same valid 6-digit
+    // code could be replayed for its whole ~90s validity window (the
+    // clock-drift tolerance in verifyTotp).
+    const validTotp = totpResult.valid && totpResult.step !== user.totpLastUsedStep;
     let usedBackupIndex = -1;
 
     if (!validTotp) {
@@ -57,7 +61,12 @@ export async function authorizeCredentials(
 
     if (!validTotp && usedBackupIndex === -1) throw new InvalidMfaCodeError();
 
-    if (usedBackupIndex !== -1) {
+    if (validTotp) {
+      await db.user.update({
+        where: { id: user.id },
+        data: { totpLastUsedStep: totpResult.step },
+      });
+    } else if (usedBackupIndex !== -1) {
       // Single-use: remove the code the moment it's spent, so a
       // leaked/observed backup code can't be replayed.
       const codes = (user.backupCodes as string[] | null) ?? [];
