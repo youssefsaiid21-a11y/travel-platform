@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 prisma/migrations_sqlite_archive/
+
+# background-agent worktree scratch state
+.claude/worktrees/
