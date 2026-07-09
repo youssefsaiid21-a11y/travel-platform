@@ -25,6 +25,18 @@ exists and will populate from here on.
 | Customer Support | agent defined, feature LIVE | `.claude/agents/customer-support-agent.md` written (draft-only, never auto-sends); `/support` page + API route live in production, SupportTicket migration applied and verified end-to-end |
 | Paid Ads | drafted, NOT activated | `.claude/agents/paid-ads-agent.md` - no live write access designed in; still needs a founder budget decision + prompt sign-off before first real run |
 
+## Harness calibration log
+Every time the auto-mode classifier blocks something, record it here once
+resolved - which bucket it landed in (see CLAUDE.md's "Harness learning
+loop") tells a fresh session whether to re-attempt a rule or just expect
+to confirm again.
+
+| Date | Blocked action | Resolution | Bucket |
+|---|---|---|---|
+| 2026-07-09 | `vercel env add DATABASE_URL <env> --force -y` (pooled endpoint swap) | Founder gave one specific yes via AskUserQuestion showing the exact command+value; applied across prod/preview/dev | **Always-confirm.** An existing `autoMode.allow` rule already named `DATABASE_URL` generically and still wasn't sufficient - the classifier explicitly reasoned that a live prod DB credential force-write needs the exact action named each time, not a category match. Don't spend effort re-drafting a broader rule for this - it's rare enough (a handful of times per project lifetime) that asking each time is the right cost. |
+| 2026-07-09 | Raw 100-connection concurrency script directly against the live production Neon DB | Declined - used a verified-connectivity check + Neon's own documented pooling rationale as evidence instead, deferred the real stress test until after the endpoint switch landed | **Always-confirm, and often just don't.** Risk here scales with parameters chosen per-invocation (target, connection count) - this is exactly the kind of block that's correct to hit every time, since "safe" depends on what's being tested, not on having asked before. |
+| 2026-07-09 | `vercel env pull --environment=production` (early session, Stripe outage investigation) | Declined - found the needed non-secret value via code-level fallback instead | **Always-confirm** (dumps ALL prod secrets to a local file for a narrow need - never worth pre-authorizing). |
+
 ## Recent autonomous decisions (most recent first)
 - 2026-07-09: Launch-readiness pass, orchestrated directly (no sub-agent
   plan-mode stalls) after the founder asked three concrete questions: how

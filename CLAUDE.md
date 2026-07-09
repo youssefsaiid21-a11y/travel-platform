@@ -306,6 +306,49 @@ Rules going forward:
    that `npm test`'s globbing picks up, producing spurious failures from
    stale/parallel-universe code that look like real regressions.
 
+### Harness learning loop (how this charter actually gets sharper over time)
+Writing autonomy policy in prose (the section above) doesn't by itself
+reduce how often the auto-mode classifier stops and asks - the classifier
+only reads literal `.claude/settings.json` `autoMode.allow` rules. So
+"getting more autonomous" isn't a vibe, it's a concrete artifact-update
+step that has to happen every time a block gets resolved, not "later":
+
+1. **When the classifier blocks something, get it resolved (approved or
+   declined), then immediately classify the block itself, before moving
+   on:**
+   - **Repeatable, bounded risk** (the risk profile is the same every time
+     this action runs - e.g. deploying after a defined review gate,
+     writing an already-integrated service's test-mode key) -> draft the
+     exact `autoMode.allow` rule text in the same turn and get one sign-off
+     on that literal text. From then on this category shouldn't need to be
+     asked about again.
+   - **Variable risk even within the same category** (the actual danger
+     depends on parameters chosen each specific time - e.g. "run a
+     concurrency test against production" varies enormously by scale and
+     target; "force-write a live DB connection string" is rare and
+     consequential enough that the classifier will keep asking for a fresh
+     confirmation even after a rule names the exact env var - seen twice
+     in this repo, 2026-07-09) -> do NOT keep trying to write a bypass
+     rule for these. Log them as "always confirm" in
+     `.claude/BUSINESS_STATE.md`'s calibration log and stop treating
+     repeated confirmation requests here as harness friction to remove -
+     it's the classifier correctly declining to let a one-time broad
+     phrasing pre-authorize an action whose blast radius isn't fixed.
+2. **Keep a calibration log**, not just a decision log -
+   `.claude/BUSINESS_STATE.md`'s "Harness calibration" section records
+   every block: what was attempted, why the classifier stopped it, how it
+   resolved, and which bucket (1a or 1b above) it landed in. A fresh
+   session reads this before assuming a past block means the same rule
+   should be re-attempted, or that a variable-risk action has become safe
+   to skip confirming.
+3. **The actual "self-learning" substrate spans two layers, not one:**
+   this repo's `CLAUDE.md`/`BUSINESS_STATE.md` capture what's true about
+   *this* codebase and business; the operator's own cross-session memory
+   (outside this repo) captures generalizable judgment patterns - which
+   category of action tends to be rule-worthy vs. always-confirm, how this
+   founder prefers escalations bundled vs. sequential, etc. - that should
+   inform how new projects get bootstrapped, not just this one.
+
 ## Working style
 - Use plan mode / write a PLAN.md when YOU (the session directly talking to
   the founder) are the one deciding scope/approach on a non-trivial
