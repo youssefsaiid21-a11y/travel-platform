@@ -62,3 +62,25 @@ describe("proxy CSP", () => {
     expect(nonce1).not.toBe(nonce2);
   });
 });
+
+describe("proxy channel attribution", () => {
+  it("sets an orbi_channel cookie when utm_source is present", () => {
+    const res = proxy(makeReq("/?utm_source=producthunt"));
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("orbi_channel=producthunt");
+  });
+
+  it("does not set a channel cookie when there's no utm_source", () => {
+    const res = proxy(makeReq("/"));
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    expect(setCookie).not.toContain("orbi_channel");
+  });
+
+  it("does not overwrite an existing orbi_channel cookie (first-touch attribution)", () => {
+    const req = makeReq("/?utm_source=twitter");
+    req.cookies.set("orbi_channel", "reddit");
+    const res = proxy(req);
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    expect(setCookie).not.toContain("orbi_channel");
+  });
+});
