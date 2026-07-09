@@ -25,6 +25,24 @@ unmeasured - standing this up is the next real prerequisite (see
 | Paid Ads | not built | needs a budget decision + trustworthy Finance data first |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-09: Consolidated `.claude/settings.json` autoMode permission rules after
+  founder feedback that the system required intervention too often. Root causes
+  diagnosed: (1) the Executive Charter in CLAUDE.md and the harness's separate
+  auto-mode classifier don't share context - charter policy has to be re-encoded
+  as explicit classifier rules to actually reduce prompts; (2) writing/committing
+  permission-widening rules is itself gated ("self-modification"), requiring the
+  *exact* rule text confirmed, not general "go ahead" enthusiasm; (3) settings
+  changes need a `/hooks` reload or restart to take effect mid-session - a
+  mechanical gap, not a trust question. Founder gave one explicit, exact-text
+  sign-off covering: routine dev-loop commands, safe env-var writes,
+  review-gated `vercel deploy --prod`, standing `git push origin main` (matches
+  this repo's pre-existing no-PR-workflow convention), and creating/editing
+  `.claude/agents/*.md` for the non-money-tier roster only (Finance/Paid Ads
+  agent definitions still need per-instance review). Also added: any UI/runtime-
+  facing diff needs real claude-in-chrome browser verification before being
+  called done or before an autonomous deploy - automated tests alone aren't
+  sufficient evidence (precedent: the CSP header incident that broke all client
+  interactivity while passing every automated check).
 - 2026-07-09: Fixed missing Stripe env vars across Production/Preview/Development
   (`STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`)
   - was the confirmed cause of broken production booking/payment. Test-mode keys
