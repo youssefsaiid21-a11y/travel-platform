@@ -1,5 +1,42 @@
 import type { BookingNotificationData, PriceDropNotificationData } from "./index";
 
+// Plain-text operational alerts to the founder (new support ticket, site
+// health check failure) - deliberately simple (no HTML template) since
+// these are internal notifications, not customer-facing emails. Needs both
+// RESEND_API_KEY and ALERT_EMAIL (the founder's own inbox) set - no-ops
+// with a warning if either is missing, same fail-open pattern as the rest
+// of this module.
+export async function sendAlertEmail(subject: string, text: string): Promise<void> {
+  const key = process.env.RESEND_API_KEY;
+  const to = process.env.ALERT_EMAIL;
+  if (!key || !to) {
+    console.warn("[notifications/email] RESEND_API_KEY or ALERT_EMAIL not set - skipping alert:", subject);
+    return;
+  }
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Orbi Alerts <alerts@orbi.travel>",
+      to: [to],
+      subject,
+      text,
+    }),
+  });
+
+  if (!res.ok) {
+    console.error(
+      "[notifications/email] Resend error (alert):",
+      res.status,
+      (await res.text().catch(() => "")).slice(0, 300)
+    );
+  }
+}
+
 // Every other value interpolated into these templates is either
 // system-controlled (IATA codes, formatted prices/dates) or already
 // constrained by passengerValidationError's format checks - passengerName

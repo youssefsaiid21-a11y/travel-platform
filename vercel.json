@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/cleanup-chat-sessions",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/check-site-health",
+      "schedule": "0 6 * * *"
     }
   ]
 }

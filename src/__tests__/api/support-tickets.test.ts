@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 const mockCreate = vi.hoisted(() => vi.fn());
 const mockEnforceRateLimit = vi.hoisted(() => vi.fn());
 const mockTrack = vi.hoisted(() => vi.fn());
+const mockSendAlertEmail = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db", () => ({
   db: {
@@ -21,6 +22,10 @@ vi.mock("@vercel/analytics/server", () => ({
   track: mockTrack,
 }));
 
+vi.mock("@/lib/notifications/email", () => ({
+  sendAlertEmail: mockSendAlertEmail,
+}));
+
 import { POST } from "@/app/api/support-tickets/route";
 
 function makeRequest(body: object) {
@@ -35,6 +40,7 @@ beforeEach(() => {
   mockCreate.mockReset();
   mockEnforceRateLimit.mockReset().mockResolvedValue(null);
   mockTrack.mockReset().mockResolvedValue(undefined);
+  mockSendAlertEmail.mockReset().mockResolvedValue(undefined);
 });
 
 describe("POST /api/support-tickets", () => {
@@ -56,6 +62,10 @@ describe("POST /api/support-tickets", () => {
         bookingRef: null,
       },
     });
+    expect(mockSendAlertEmail).toHaveBeenCalledWith(
+      expect.stringContaining("Help"),
+      expect.stringContaining("user@example.com")
+    );
   });
 
   it("rejects an invalid email", async () => {

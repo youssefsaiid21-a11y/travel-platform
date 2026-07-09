@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { track } from "@vercel/analytics/server";
+import { sendAlertEmail } from "@/lib/notifications/email";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -29,16 +30,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Message is too long" }, { status: 400 });
   }
 
+  const trimmedSubject = subject.trim().slice(0, 200);
+  const trimmedMessage = message.trim();
+  const trimmedBookingRef = typeof bookingRef === "string" && bookingRef.trim() ? bookingRef.trim() : null;
+
   const ticket = await db.supportTicket.create({
     data: {
       email,
-      subject: subject.trim().slice(0, 200),
-      message: message.trim(),
-      bookingRef: typeof bookingRef === "string" && bookingRef.trim() ? bookingRef.trim() : null,
+      subject: trimmedSubject,
+      message: trimmedMessage,
+      bookingRef: trimmedBookingRef,
     },
   });
 
   track("support_ticket_created", { hasBookingRef: !!ticket.bookingRef }).catch(() => {});
+
+  sendAlertEmail(
+    `New support ticket: ${trimmedSubject}`,
+    `From: ${email}\n${trimmedBookingRef ? `Booking ref: ${trimmedBookingRef}\n` : ""}\n${trimmedMessage}`
+  ).catch((err) => console.error("Failed to send support ticket alert:", err));
 
   return NextResponse.json({ id: ticket.id }, { status: 201 });
 }

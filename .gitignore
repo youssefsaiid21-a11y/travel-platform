@@ -47,3 +47,4 @@ prisma/migrations_sqlite_archive/
 # sensitive audit output - itemizes real security/compliance/financial
 # gaps; this repo is public, so this stays local-only, never committed
 docs/go-live-checklist.md
+docs/disaster-recovery.md
