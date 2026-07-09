@@ -82,7 +82,22 @@ describe("POST /api/stripe/payment-intent", () => {
 
     expect(mockGetOfferWithServices).toHaveBeenCalledWith("off_abc123");
     expect(mockPaymentIntentsCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 34250, currency: "gbp" })
+      // 34250 (offer price) + 500 (flat service fee) = 34750
+      expect.objectContaining({ amount: 34750, currency: "gbp" })
+    );
+  });
+
+  it("adds the flat $5 service fee on top of the offer's price", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: "usr_1" } });
+    mockGetOfferWithServices.mockResolvedValueOnce(
+      makeOffer({ total_amount: "100.00", total_currency: "USD" })
+    );
+    mockPaymentIntentsCreate.mockResolvedValueOnce({ client_secret: "pi_test_secret" });
+
+    await POST(makeRequest({ offerId: "off_abc123" }));
+
+    expect(mockPaymentIntentsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 10500 })
     );
   });
 

@@ -65,6 +65,11 @@ model Booking {
   status                String   @default("pending")
   totalAmount           String
   totalCurrency         String
+  // Flat per-booking service fee (see src/lib/pricing.ts), included in
+  // totalAmount - broken out separately so margin can actually be
+  // reconciled against Duffel's cost. Existing rows predate the fee model
+  // (charged $0 margin), hence the "0.00" default/backfill.
+  serviceFeeAmount      String   @default("0.00")
   offerSnapshot         Json
   searchParams          Json
   passengerNames        Json

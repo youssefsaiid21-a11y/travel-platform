@@ -9,6 +9,7 @@ import type { SearchParams } from "@/lib/parser/types";
 import type { BookingPassenger } from "@/app/api/booking/route";
 import { passengerValidationError } from "@/lib/passengerValidation";
 import { getCountryOptions } from "@/lib/countries";
+import { SERVICE_FEE_CENTS, chargeAmountCents, centsToAmountString } from "@/lib/pricing";
 import { BookingSteps } from "@/components/BookingSteps";
 import { PlaneIcon, PassportIcon } from "@/components/icons";
 import styles from "./page.module.css";
@@ -449,9 +450,15 @@ export default function ConfirmPage() {
               <span>{fmtPrice(offer.tax_amount, offer.total_currency)}</span>
             </div>
           )}
+          <div className={styles.priceRow}>
+            <span>Service fee</span>
+            <span>{fmtPrice(centsToAmountString(SERVICE_FEE_CENTS), offer.total_currency)}</span>
+          </div>
           <div className={`${styles.priceRow} ${styles.totalRow}`}>
             <span>Total</span>
-            <span>{fmtPrice(offer.total_amount, offer.total_currency)}</span>
+            <span>
+              {fmtPrice(centsToAmountString(chargeAmountCents(offer.total_amount)), offer.total_currency)}
+            </span>
           </div>
         </section>
 
@@ -678,7 +685,7 @@ export default function ConfirmPage() {
             >
               {loadingIntent
                 ? "Preparing payment…"
-                : `Pay ${fmtPrice(offer.total_amount, offer.total_currency)}`}
+                : `Pay ${fmtPrice(centsToAmountString(chargeAmountCents(offer.total_amount)), offer.total_currency)}`}
             </button>
 
             <div className={styles.trustBar}>

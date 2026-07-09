@@ -83,7 +83,8 @@ function makeSucceededPaymentIntent(overrides: Record<string, unknown> = {}) {
   return {
     id: PI_ID,
     status: "succeeded",
-    amount: 34250,
+    // Offer price (342.50 = 34250 cents) + the flat 500-cent service fee.
+    amount: 34750,
     currency: "gbp",
     metadata: { userId: USER_ID, offerId: OFFER_ID },
     ...overrides,
@@ -240,7 +241,8 @@ describe("POST /api/booking", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           status: "failed",
-          totalAmount: "342.50",
+          // 342.50 offer price + the flat 5.00 service fee
+          totalAmount: "347.50",
           totalCurrency: "GBP",
         }),
       })
@@ -275,14 +277,20 @@ describe("POST /api/booking", () => {
     expect(body.booking.status).toBe("confirmed");
     expect(mockBookingCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ userId: USER_ID, status: "pending", stripePaymentIntentId: PI_ID }),
+        data: expect.objectContaining({
+          userId: USER_ID,
+          status: "pending",
+          stripePaymentIntentId: PI_ID,
+          serviceFeeAmount: "5.00",
+        }),
       })
     );
     expect(mockBookingUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: PENDING_BOOKING_ID },
         data: expect.objectContaining({
-          totalAmount: "342.50",
+          // 342.50 offer price + the flat 5.00 service fee
+          totalAmount: "347.50",
           totalCurrency: "GBP",
           duffelOrderId: "ord_001",
           duffelBookingRef: "DUF123",

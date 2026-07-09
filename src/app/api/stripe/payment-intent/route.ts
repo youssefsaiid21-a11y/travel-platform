@@ -4,6 +4,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { getStripe } from "@/lib/stripe";
 import { getOfferWithServices } from "@/lib/duffel/search";
 import { DuffelError } from "@/lib/duffel/client";
+import { chargeAmountCents } from "@/lib/pricing";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not verify the offer price." }, { status: 502 });
   }
 
-  const amountCents = Math.round(parseFloat(offer.total_amount) * 100);
+  const amountCents = chargeAmountCents(offer.total_amount);
   if (!Number.isFinite(amountCents) || amountCents <= 0) {
     return NextResponse.json({ error: "Invalid offer amount." }, { status: 400 });
   }

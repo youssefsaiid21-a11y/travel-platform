@@ -10,6 +10,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { passengerValidationError } from "@/lib/passengerValidation";
 import { sendBookingConfirmations } from "@/lib/notifications";
 import { track } from "@vercel/analytics/server";
+import { SERVICE_FEE_CENTS, chargeAmountCents, centsToAmountString } from "@/lib/pricing";
 
 // Duffel order creation + Stripe payment intent handling can each take a
 // few seconds; give this route enough headroom to not get cut off mid-request.
@@ -112,6 +113,7 @@ export async function POST(req: NextRequest) {
         status: "pending",
         totalAmount: (pi.amount / 100).toFixed(2),
         totalCurrency: pi.currency.toUpperCase(),
+        serviceFeeAmount: centsToAmountString(SERVICE_FEE_CENTS),
         offerSnapshot: { offerId } as Prisma.InputJsonValue,
         searchParams: searchParams as unknown as Prisma.InputJsonValue,
         passengerNames,
@@ -176,7 +178,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const expectedCents = Math.round(parseFloat(offer.total_amount) * 100);
+  const expectedCents = chargeAmountCents(offer.total_amount);
   if (
     pi.amount !== expectedCents ||
     pi.currency !== offer.total_currency.toLowerCase()
@@ -185,7 +187,7 @@ export async function POST(req: NextRequest) {
       where: { id: booking.id },
       data: {
         status: "failed",
-        totalAmount: offer.total_amount,
+        totalAmount: centsToAmountString(expectedCents),
         totalCurrency: offer.total_currency,
         offerSnapshot: offer as unknown as Prisma.InputJsonValue,
       },
@@ -255,7 +257,7 @@ export async function POST(req: NextRequest) {
       duffelOrderId,
       duffelBookingRef,
       status,
-      totalAmount: offer.total_amount,
+      totalAmount: centsToAmountString(expectedCents),
       totalCurrency: offer.total_currency,
       offerSnapshot: offer as unknown as Prisma.InputJsonValue,
     },

@@ -11,6 +11,7 @@ import {
 import type { NormalizedOffer } from "@/lib/duffel/types";
 import type { SearchParams } from "@/lib/parser/types";
 import type { BookingPassenger } from "@/app/api/booking/route";
+import { chargeAmountCents, centsToAmountString } from "@/lib/pricing";
 import styles from "./StripeCheckout.module.css";
 
 const stripePromise = loadStripe(
@@ -47,7 +48,7 @@ function CheckoutForm({
         style: "currency",
         currency: offer.total_currency,
         minimumFractionDigits: 2,
-      }).format(parseFloat(offer.total_amount));
+      }).format(parseFloat(centsToAmountString(chargeAmountCents(offer.total_amount))));
     } catch {
       return `${offer.total_amount} ${offer.total_currency}`;
     }
