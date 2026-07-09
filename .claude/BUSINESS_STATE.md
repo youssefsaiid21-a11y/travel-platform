@@ -42,6 +42,32 @@ where it touched money code:
 - Item 7 (Vercel Pro) - founder said not yet; Hobby plan's commercial-use
   ToS restriction remains unresolved until a real launch date approaches.
 
+## Follow-up deeper audit (2026-07-09, same day) - fixed 2 real vulnerabilities
+Founder asked "what else is missing" as a second pass. Investigated this
+session's own fast-moving changes for regressions plus areas the first
+audit didn't cover (admin tooling, accessibility/mobile). Found and fixed:
+- Account deletion wasn't clearing MFA fields (totpSecret/backupCodes) -
+  written before MFA existed, never updated.
+- **Real vulnerability**: `/api/auth/mfa/setup` could silently disable an
+  already-enabled MFA with no password check (a stolen session cookie
+  alone could turn off 2FA). Now requires the current password to
+  re-enroll when MFA is already on.
+- **Real vulnerability**: TOTP had no replay protection - the same valid
+  code could be reused within its ~90s window. Added
+  `User.totpLastUsedStep`, checked/updated on every login.
+All three fixed, tested (including a real browser login proving the DB
+write path works end-to-end, not just in test mocks), and deployed.
+
+New gaps surfaced, not yet fixed (see `docs/go-live-checklist.md` items
+19-24 for full detail): no account-recovery path if both authenticator +
+all backup codes are lost (genuine permanent lockout, support-ticket +
+manual DB fix only); **zero admin/operator surface exists anywhere** - no
+way to mark a support ticket resolved, no cross-user bookings view, no
+user management, refunds/cancellations need the raw Stripe/Duffel
+dashboards; real accessibility/mobile gaps (booking/confirm has zero
+`@media` queries, cookie banner isn't a real accessible dialog, disabled
+buttons and the MFA login step have no `aria-live` feedback).
+
 ## North-star metrics
 Vercel Analytics stood up 2026-07-09 (`search_completed`, `offer_selected`,
 `booking_completed` events) - no real traffic has accumulated yet, so these
