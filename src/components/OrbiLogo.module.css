@@ -9,6 +9,12 @@
   height: 0.74em;
   margin-right: 0.02em;
   flex-shrink: 0;
+  /* Bounding-box-centering the ring against "rbi" leaves it looking high:
+     the ring's visual weight is evenly distributed, but the text's is
+     concentrated in the lower x-height band (the "b" ascender and "i" dot
+     are thin, sparse ink at the top) - so the ring needs to sit a bit
+     lower than pure bbox-center to read as optically centered. */
+  transform: translateY(0.07em);
 }
 
 .ringA,
