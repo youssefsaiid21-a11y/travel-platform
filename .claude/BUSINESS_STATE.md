@@ -5,10 +5,11 @@ survives context compaction and fresh scheduled-routine sessions - update
 it in the same turn a decision worth remembering gets made, not "later."
 
 ## North-star metrics
-Phase 0 product analytics isn't built yet, so these are currently
-unmeasured - standing this up is the next real prerequisite (see
-"Open escalations" / next steps).
-- Booking conversion rate (search -> offer view -> booking -> payment): unmeasured
+Vercel Analytics stood up 2026-07-09 (`search_completed`, `offer_selected`,
+`booking_completed` events) - no real traffic has accumulated yet, so these
+are still effectively unmeasured in practice, but the instrumentation now
+exists and will populate from here on.
+- Booking conversion rate (search -> offer view -> booking -> payment): instrumented, no data yet
 - Price competitiveness vs. comparison sites: unmeasured
 - Monthly revenue vs. cost (Solvency check): unmeasured
 
@@ -16,13 +17,13 @@ unmeasured - standing this up is the next real prerequisite (see
 | Agent | Status | Notes |
 |---|---|---|
 | Operations | active | `.claude/agents/operations-agent.md` - read-only infra/health watcher |
-| SEO | not built | next up per phased order |
-| GEO | not built | |
-| Content & Virality | not built | |
-| Channel Coverage | not built | needs analytics first |
-| Finance | not built | needs product analytics + real transaction volume |
-| Customer Support | not built | needs a support intake surface first (doesn't exist yet) |
-| Paid Ads | not built | needs a budget decision + trustworthy Finance data first |
+| SEO | built, first pass run | `.claude/agents/seo-agent.md` - see branch `agents/seo-first-pass` |
+| GEO | built, first pass run | `.claude/agents/geo-agent.md` - see branch `agents/geo-first-pass` |
+| Content & Virality | built, first pass run | `.claude/agents/content-virality-agent.md` - see branch `agents/content-virality-first-pass` |
+| Channel Coverage | built, first pass run | `.claude/agents/channel-coverage-agent.md` - see branch `agents/channel-coverage-first-pass` |
+| Finance | drafted, NOT activated | `.claude/agents/finance-agent.md` - read-only by design; needs explicit founder review of this exact prompt before first real run |
+| Customer Support | code complete, NOT live | `.claude/agents/customer-support-agent.md` not yet written; `/support` page + API route built, blocked on the SupportTicket migration being applied to prod |
+| Paid Ads | drafted, NOT activated | `.claude/agents/paid-ads-agent.md` - no live write access designed in; needs a founder budget decision + prompt review before first real run |
 
 ## Recent autonomous decisions (most recent first)
 - 2026-07-09: Deployed to production (review gate passed: tests/lint/typecheck
@@ -66,12 +67,29 @@ unmeasured - standing this up is the next real prerequisite (see
   agent stood up as the first functional agent in the roster.
 
 ## Open escalations (nothing autonomous can resolve without founder input)
-- **Production redeploy needed** to bake `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-  into the live client bundle (Next.js inlines `NEXT_PUBLIC_*` at build time -
-  the env var being set on Vercel isn't enough by itself). The harness's
-  production-deploy safety classifier requires an explicit founder go-ahead for
-  `vercel deploy --prod` even though this is a routine, low-risk redeploy - not
-  something the charter can route around. **Needs one-time founder approval.**
-- Phase 0 product analytics (conversion funnel) not yet stood up - blocks
-  Channel Coverage and Finance agents from having real data to work with.
-- No customer support intake surface exists yet - blocks Customer Support agent.
+- **SupportTicket migration not yet applied to production Neon DB.** Written
+  by hand (`prisma/migrations/20260709103842_support_ticket/`), purely
+  additive (CREATE TABLE only, no ALTER of existing tables), but this repo's
+  established convention requires explicit founder approval before any
+  `prisma migrate deploy` against the shared prod DB. The harness's
+  self-modification classifier also blocked an attempt to pre-authorize
+  future *additive-only* migrations as autonomous - that specific widening
+  needs the founder's exact-text sign-off, same as any other autoMode change.
+  Until approved, `/support` and `/api/support-tickets` are code-complete but
+  non-functional in production.
+- **4 marketing agents' first-pass work is sitting on unmerged branches**,
+  per the Charter's propose-only/no-auto-merge rule for SEO, GEO,
+  Content & Virality, and Channel Coverage: `agents/seo-first-pass`,
+  `agents/geo-first-pass`, `agents/content-virality-first-pass`,
+  `agents/channel-coverage-first-pass`. Needs founder review before merging
+  to `main` (or explicit instruction to merge them directly).
+- **Finance and Paid Ads agents are drafted but not activated** - both
+  prompts are written with hard escalation gates built in, but per
+  `.claude/settings.json`, a general "keep going" instruction does not cover
+  their first real invocation. Needs the founder to review each prompt
+  (`.claude/agents/finance-agent.md`, `.claude/agents/paid-ads-agent.md`)
+  before either is ever actually run. Paid Ads additionally needs an
+  explicit budget decision first.
+- Customer Support agent definition itself (`.claude/agents/customer-support-agent.md`)
+  hasn't been written yet - lower priority than the migration gate above,
+  since the feature can't go live without the migration regardless.
