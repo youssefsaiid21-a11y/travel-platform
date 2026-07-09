@@ -4,6 +4,21 @@ Living dashboard for the Executive Charter in `CLAUDE.md`. This is what
 survives context compaction and fresh scheduled-routine sessions - update
 it in the same turn a decision worth remembering gets made, not "later."
 
+## Go-live checklist progress (2026-07-09)
+Founder triaged the full go-live checklist (see local `docs/go-live-checklist.md`,
+gitignored - sensitive). Fixed and deployed to production this pass:
+item 1 ($5 flat service fee - first real revenue mechanism), item 4
+(passport-number field-level encryption + account deletion/data export),
+item 5 (cookie consent banner gating the attribution cookie), item 8/9/10
+partially (Stripe live-key code gate added, item 12), item 13 (npm audit
+fixed via a postcss override, not a next downgrade), item 17 (TOTP 2FA +
+backup codes), item 18 (see below - documented, not yet fully addressed).
+Deferred per founder's explicit call: items 2 (refunds), 3 (legal pages),
+6 (licensing), 11 (Duffel/Stripe account-level steps), 15 (custom domain).
+Still open: items 8/9/14 (Resend/Sentry/uptime - need founder decision on
+credentials), 16 (reconciliation, in progress), 7 (Vercel Pro purchase
+decision, not yet asked).
+
 ## North-star metrics
 Vercel Analytics stood up 2026-07-09 (`search_completed`, `offer_selected`,
 `booking_completed` events) - no real traffic has accumulated yet, so these
