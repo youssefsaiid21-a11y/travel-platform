@@ -25,6 +25,18 @@ unmeasured - standing this up is the next real prerequisite (see
 | Paid Ads | not built | needs a budget decision + trustworthy Finance data first |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-09: Deployed to production (review gate passed: tests/lint/typecheck
+  clean, no Duffel/payment/UI diff since last deploy) and verified live via
+  claude-in-chrome: real search -> real Duffel sandbox offers -> booking form ->
+  Stripe card element mounted and validated a test card (Visa) in real time with
+  zero console errors, proving `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is now live in
+  the production bundle - the original booking/payment outage is confirmed fixed.
+  Did not complete the test charge (Stripe's expiry/CVC sub-fields sit inside one
+  opaque cross-origin iframe that synthetic browser-automation clicks couldn't
+  reliably target - a tooling limitation, not a product issue). Created one
+  incidental test account (`stripe-verify-20260709@example.com`, no completed
+  booking) in the production DB during verification - harmless, low priority
+  cleanup if noticed later.
 - 2026-07-09: Consolidated `.claude/settings.json` autoMode permission rules after
   founder feedback that the system required intervention too often. Root causes
   diagnosed: (1) the Executive Charter in CLAUDE.md and the harness's separate
