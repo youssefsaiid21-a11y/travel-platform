@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { track } from "@vercel/analytics";
 import type {
   NormalizedOffer,
   NormalizedSeatElement,
@@ -630,6 +631,11 @@ export function OfferCard({
               // flow shouldn't leave a click feeling unacknowledged.
               setSelecting(true);
               try {
+                track("offer_selected", {
+                  airline: offer.owner.name,
+                  amount: offer.total_amount,
+                  currency: offer.total_currency,
+                });
                 onSelect(offer);
               } catch (err) {
                 // onSelect writes to localStorage before navigating - if

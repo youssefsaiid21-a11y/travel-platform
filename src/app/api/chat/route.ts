@@ -8,6 +8,7 @@ import { DuffelError } from "@/lib/duffel/client";
 import { enforceRateLimit, checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import type { NormalizedOffer } from "@/lib/duffel/types";
 import type { ExploreDestinationResult, ExploreParams, SearchParams } from "@/lib/parser/types";
+import { track } from "@vercel/analytics/server";
 
 export interface ChatRequest {
   message: string;
@@ -397,6 +398,12 @@ export async function POST(req: NextRequest) {
         session.last_params = usedParams;
         session.last_offers = offers;
         await save(session);
+
+        track("search_completed", {
+          offerCount: offers.length,
+          origin: usedParams.origin,
+          destination: usedParams.destination,
+        }).catch(() => {});
 
         push("done", {
           session_id: session.id,

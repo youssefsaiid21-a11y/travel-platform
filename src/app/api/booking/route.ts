@@ -9,6 +9,7 @@ import { getStripe } from "@/lib/stripe";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { passengerValidationError } from "@/lib/passengerValidation";
 import { sendBookingConfirmations } from "@/lib/notifications";
+import { track } from "@vercel/analytics/server";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
@@ -275,6 +276,12 @@ export async function POST(req: NextRequest) {
       console.error("Failed to send booking confirmations:", err)
     );
   }
+
+  track("booking_completed", {
+    status,
+    totalCurrency: offer.total_currency,
+    totalAmount: offer.total_amount,
+  }).catch(() => {});
 
   return NextResponse.json({ booking: finalBooking }, { status: 201 });
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ViewTransition } from "react";
 import { SessionProvider } from "next-auth/react";
+import { Analytics } from "@vercel/analytics/next";
 import { auth } from "@/auth";
 import NavBar from "@/components/NavBar";
 import "./globals.css";
@@ -38,6 +39,7 @@ export default async function RootLayout({
             <ViewTransition>{children}</ViewTransition>
           </div>
         </SessionProvider>
+        <Analytics />
       </body>
     </html>
   );
