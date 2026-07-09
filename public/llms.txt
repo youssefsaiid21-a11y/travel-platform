@@ -1,0 +1,34 @@
+# Orbi
+
+Orbi is an AI-agent-driven flight booking platform. Users search for
+flights using plain natural-language queries (e.g. "London to New York
+next Friday" or "cheap flights from London this weekend, anywhere"), and
+Orbi parses the request and returns real flight offers.
+
+## How it works
+
+- Natural-language flight search is powered by an LLM (Z.AI's
+  GLM-4-32B model) that parses free-text queries into structured search
+  parameters.
+- Flight data and booking are sourced from Duffel, a flight-booking API
+  aggregating 300+ airlines. Orbi's current deployment runs against
+  Duffel's sandbox environment (test data, not live production airline
+  inventory).
+- Payment is processed via Stripe. Orbi's current deployment runs Stripe
+  in test mode (no real charges).
+- Users can save passenger details once (name, date of birth, passport
+  info) for faster repeat booking.
+- Orbi supports round-trip, multi-city, and flexible-date search, with a
+  price calendar and price-drop tracking for saved searches.
+
+## What Orbi is not
+
+Orbi is a search-and-booking product, not a travel agency, airline, or
+ticket reseller. It does not currently connect to live production airline
+inventory or process real payments in its current deployment - this file
+describes the sandbox/test-mode deployment accurately rather than
+overstating production readiness.
+
+## Contact
+
+Support: https://orbi.travel/support

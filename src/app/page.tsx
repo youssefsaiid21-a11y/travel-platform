@@ -129,7 +129,7 @@ function pickSuggestions(msg: Message): string[] | null {
 
 const STEP_LABELS: Record<string, string> = {
   parsing: "Understanding your request…",
-  searching: "Searching 500+ airlines…",
+  searching: "Searching 300+ airlines…",
   ranking: "Ranking results…",
 };
 
