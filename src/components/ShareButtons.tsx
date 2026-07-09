@@ -1,7 +1,15 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useTemporaryFlag } from "@/lib/useTemporaryFlag";
 import styles from "./ShareButtons.module.css";
+
+// orbi.travel is the intended future custom domain, not yet live - see
+// src/lib/site.ts for the same fallback pattern used elsewhere. Kept as a
+// plain constant here (rather than importing getBaseUrl, a server-safe
+// helper) since this is a "use client" component evaluated at build time
+// for the env var read either way.
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://travel-platform-ashy.vercel.app";
 
 interface ShareButtonsProps {
   bookingRef: string | null;
@@ -40,18 +48,44 @@ function buildMessage(p: ShareButtonsProps): string {
     "",
     `Total: ${fmtAmount(p.totalAmount, p.totalCurrency)}`,
     "",
-    "Booked via Orbi 🌐",
+    `Booked via Orbi 🌐 ${SITE_URL}?utm_source=share&utm_medium=booking_confirmation`,
   ].join("\n");
+}
+
+// iOS's sms: URI needs "&body=", every other platform (and the spec)
+// expects "?body=" - getting this wrong silently drops the pre-filled text
+// on whichever platform doesn't match. Read after mount only (matches the
+// existing hydration-safe pattern in src/app/page.tsx) since navigator.userAgent
+// isn't available during SSR and must not affect the server-rendered markup.
+function detectIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  // iPadOS 13+ reports as "Macintosh" but exposes multi-touch, unlike a real Mac.
+  const isIPadOS = ua.includes("Macintosh") && navigator.maxTouchPoints > 1;
+  return /iPhone|iPad|iPod/.test(ua) || isIPadOS;
 }
 
 export function ShareButtons(props: ShareButtonsProps) {
   const [copied, markCopied] = useTemporaryFlag();
+  const [isIOS, setIsIOS] = useState(false);
+  const [canNativeShare, setCanNativeShare] = useState(false);
+
+  useEffect(() => {
+    // navigator.userAgent/share aren't available during SSR and must not
+    // affect the server-rendered markup - read once after mount only.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reading platform capability after mount, not syncing a prop/render value
+    setIsIOS(detectIOS());
+    setCanNativeShare(typeof navigator.share === "function");
+  }, []);
 
   const msg = buildMessage(props);
   const encoded = encodeURIComponent(msg);
 
   const whatsappUrl = `https://wa.me/?text=${encoded}`;
-  const smsUrl = `sms:&body=${encoded}`;
+  const smsUrl = isIOS ? `sms:&body=${encoded}` : `sms:?body=${encoded}`;
+  const emailUrl = `mailto:?subject=${encodeURIComponent(
+    `My flight booking - ${props.route}`
+  )}&body=${encoded}`;
 
   async function copyToClipboard() {
     try {
@@ -70,10 +104,28 @@ export function ShareButtons(props: ShareButtonsProps) {
     } catch { /* ignore */ }
   }
 
+  async function nativeShare() {
+    try {
+      await navigator.share({ text: msg });
+    } catch { /* user cancelled or unsupported - ignore */ }
+  }
+
   return (
     <div className={styles.wrap}>
       <p className={styles.label}>Share confirmation</p>
       <div className={styles.row}>
+        {canNativeShare && (
+          <button
+            className={`${styles.btn} ${styles.native}`}
+            onClick={nativeShare}
+            type="button"
+            aria-label="Share"
+          >
+            <ShareIcon />
+            Share
+          </button>
+        )}
+
         <a
           href={whatsappUrl}
           target="_blank"
@@ -88,10 +140,19 @@ export function ShareButtons(props: ShareButtonsProps) {
         <a
           href={smsUrl}
           className={`${styles.btn} ${styles.imessage}`}
-          aria-label="Share via iMessage"
+          aria-label="Share via text message"
         >
           <IMessageIcon />
-          iMessage
+          {isIOS ? "iMessage" : "Text"}
+        </a>
+
+        <a
+          href={emailUrl}
+          className={`${styles.btn} ${styles.email}`}
+          aria-label="Share via email"
+        >
+          <EmailIcon />
+          Email
         </a>
 
         <button
@@ -119,6 +180,23 @@ function IMessageIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+    </svg>
+  );
+}
+
+function EmailIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>
+    </svg>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+      <path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/>
     </svg>
   );
 }

@@ -55,6 +55,16 @@
   color: #fff;
 }
 
+.email {
+  background: var(--text-2);
+  color: #fff;
+}
+
+.native {
+  background: var(--gradient-accent);
+  color: #fff;
+}
+
 /* Copy - ghost style */
 .copy {
   background: var(--surface-raised);
