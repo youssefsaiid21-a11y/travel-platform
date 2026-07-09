@@ -7,6 +7,8 @@ import { ProfileSection } from "./ProfileSection";
 import { ChangePasswordSection } from "./ChangePasswordSection";
 import { SignOutBtn } from "./SignOutBtn";
 import { UpdateNameSection } from "./UpdateNameSection";
+import { DeleteAccountSection } from "./DeleteAccountSection";
+import { safeDecryptPassport } from "@/lib/crypto";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
@@ -65,10 +67,19 @@ export default async function ProfilePage() {
           <ProfileSection
             profile={
               profile
-                ? { ...profile, updatedAt: profile.updatedAt.toISOString() }
+                ? {
+                    ...profile,
+                    passportNumber: safeDecryptPassport(profile.passportNumber),
+                    updatedAt: profile.updatedAt.toISOString(),
+                  }
                 : null
             }
           />
+        </section>
+
+        <section className={styles.card}>
+          <h2 className={styles.cardTitle}>Your data</h2>
+          <DeleteAccountSection />
         </section>
 
         <SignOutBtn />

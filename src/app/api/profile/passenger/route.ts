@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { passengerDocFieldFormatError } from "@/lib/passengerValidation";
+import { encryptField, safeDecryptPassport } from "@/lib/crypto";
 
 export async function GET() {
   const session = await auth();
@@ -13,7 +14,12 @@ export async function GET() {
     where: { userId: session.user.id },
   });
 
-  return NextResponse.json(profile ?? null);
+  if (!profile) return NextResponse.json(null);
+
+  return NextResponse.json({
+    ...profile,
+    passportNumber: safeDecryptPassport(profile.passportNumber),
+  });
 }
 
 export async function DELETE() {
@@ -55,7 +61,7 @@ export async function POST(req: NextRequest) {
     givenName, familyName, bornOn, gender, title, phone,
     specialRequests: specialRequests ?? null,
     nationality: nationality ?? null,
-    passportNumber: passportNumber ?? null,
+    passportNumber: passportNumber ? encryptField(passportNumber) : null,
     passportExpiry: passportExpiry ?? null,
   };
 
@@ -65,5 +71,8 @@ export async function POST(req: NextRequest) {
     create: { userId: session.user.id, ...data },
   });
 
-  return NextResponse.json(profile);
+  return NextResponse.json({
+    ...profile,
+    passportNumber: safeDecryptPassport(profile.passportNumber),
+  });
 }

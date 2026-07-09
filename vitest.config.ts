@@ -11,6 +11,9 @@ export default defineConfig({
     // guard doesn't throw before the mock is ever reached.
     env: {
       STRIPE_SECRET_KEY: "sk_test_placeholder_for_unit_tests",
+      // A real 32-byte AES-256 key, base64-encoded - not the production
+      // key, just needs to be valid-shaped for src/lib/crypto.ts to work.
+      PASSPORT_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
     },
   },
   resolve: {

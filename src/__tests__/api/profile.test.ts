@@ -74,6 +74,26 @@ describe("GET /api/profile/passenger", () => {
     expect(body.givenName).toBe("Jane");
     expect(body.familyName).toBe("Smith");
   });
+
+  it("decrypts an encrypted passport number for the client", async () => {
+    const { encryptField } = await import("@/lib/crypto");
+    mockAuth.mockResolvedValueOnce({ user: { id: MOCK_USER_ID } });
+    mockFindUnique.mockResolvedValueOnce({
+      ...MOCK_PROFILE,
+      passportNumber: encryptField("987654321"),
+    });
+    const res = await GET();
+    const body = await res.json();
+    expect(body.passportNumber).toBe("987654321");
+  });
+
+  it("passes through a legacy plaintext passport number that predates encryption", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: MOCK_USER_ID } });
+    mockFindUnique.mockResolvedValueOnce({ ...MOCK_PROFILE, passportNumber: "LEGACY123" });
+    const res = await GET();
+    const body = await res.json();
+    expect(body.passportNumber).toBe("LEGACY123");
+  });
 });
 
 describe("DELETE /api/profile/passenger", () => {
@@ -128,7 +148,8 @@ describe("POST /api/profile/passenger", () => {
     expect(res.status).toBe(400);
   });
 
-  it("saves passport/nationality fields when provided", async () => {
+  it("saves passport/nationality fields when provided, with the passport number encrypted", async () => {
+    const { decryptField } = await import("@/lib/crypto");
     mockAuth.mockResolvedValueOnce({ user: { id: MOCK_USER_ID } });
     mockUpsert.mockResolvedValueOnce(MOCK_PROFILE);
     const res = await POST(makeRequest("POST", {
@@ -142,11 +163,13 @@ describe("POST /api/profile/passenger", () => {
       expect.objectContaining({
         update: expect.objectContaining({
           nationality: "GB",
-          passportNumber: "987654321",
           passportExpiry: "2035-01-01",
         }),
       })
     );
+    const writtenPassport = mockUpsert.mock.calls[0][0].update.passportNumber;
+    expect(writtenPassport).not.toBe("987654321");
+    expect(decryptField(writtenPassport)).toBe("987654321");
   });
 
   it("still saves the profile with null passport fields when they're omitted (partial save is allowed)", async () => {
