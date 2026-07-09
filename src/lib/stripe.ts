@@ -13,6 +13,16 @@ export function getStripe(): Stripe {
     if (!key) {
       throw new Error("STRIPE_SECRET_KEY is not set.");
     }
+    // Mirrors the same guardrail already enforced on the Duffel client
+    // (src/lib/duffel/client.ts) - CLAUDE.md guardrail #1 bans live/
+    // production payment endpoints, but until now nothing in code actually
+    // stopped a live sk_live_ key from being used the moment it was set.
+    if (!key.startsWith("sk_test_")) {
+      throw new Error(
+        "STRIPE_SECRET_KEY must be a test-mode key (starts with sk_test_). " +
+          "Live keys are not permitted in this application. See CLAUDE.md guardrail #1."
+      );
+    }
     stripeClient = new Stripe(key);
   }
   return stripeClient;
