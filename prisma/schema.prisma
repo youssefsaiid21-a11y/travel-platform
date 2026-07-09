@@ -20,6 +20,16 @@ model User {
   // zero-DB-hit JWT strategy accepts, specifically to close that gap.
   tokenVersion     Int              @default(0)
   createdAt        DateTime         @default(now())
+  // TOTP secret (base32) - set as soon as setup begins, but totpEnabled
+  // stays false until the user proves they can actually generate a valid
+  // code with it (src/app/api/auth/mfa/confirm), so a botched enrollment
+  // can never lock someone out.
+  totpSecret       String?
+  totpEnabled      Boolean          @default(false)
+  // Array of bcrypt-hashed single-use recovery codes, shown to the user
+  // once at enrollment time and never retrievable again. A code is removed
+  // from this array the moment it's used (src/auth.ts's authorize()).
+  backupCodes      Json?
   bookings         Booking[]
   passengerProfile PassengerProfile?
   trackedSearches  TrackedSearch[]

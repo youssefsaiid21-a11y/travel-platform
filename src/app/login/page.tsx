@@ -27,6 +27,8 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [step, setStep] = useState<"password" | "otp">("password");
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,17 +41,26 @@ export default function LoginPage() {
     const result = await signIn("credentials", {
       email,
       password,
+      otp: step === "otp" ? otp : "",
       redirect: false,
     });
 
     setLoading(false);
 
+    if (result?.code === "mfa_required") {
+      setStep("otp");
+      return;
+    }
+    if (result?.code === "invalid_code") {
+      setError("Incorrect code. Please try again.");
+      return;
+    }
     if (result?.error) {
       setError("Invalid email or password.");
-    } else {
-      router.push(callbackUrl);
-      router.refresh();
+      return;
     }
+    router.push(callbackUrl);
+    router.refresh();
   }
 
   return (
@@ -80,46 +91,80 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
-          <label className={styles.label}>
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={styles.input}
-              autoComplete="email"
-              required
-              autoFocus
-            />
-          </label>
+          {step === "password" ? (
+            <>
+              <label className={styles.label}>
+                Email
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={styles.input}
+                  autoComplete="email"
+                  required
+                  autoFocus
+                />
+              </label>
 
-          <label className={styles.label}>
-            Password
-            <div className={styles.passwordWrap}>
+              <label className={styles.label}>
+                Password
+                <div className={styles.passwordWrap}>
+                  <input
+                    type={showPw ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={styles.input}
+                    autoComplete="current-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className={styles.showBtn}
+                    onClick={() => setShowPw((v) => !v)}
+                    aria-label={showPw ? "Hide password" : "Show password"}
+                  >
+                    <EyeIcon open={showPw} />
+                  </button>
+                </div>
+              </label>
+            </>
+          ) : (
+            <label className={styles.label}>
+              Two-factor code
               <input
-                type={showPw ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                type="text"
+                inputMode="numeric"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
                 className={styles.input}
-                autoComplete="current-password"
+                placeholder="6-digit code or backup code"
+                autoComplete="one-time-code"
+                autoFocus
                 required
               />
-              <button
-                type="button"
-                className={styles.showBtn}
-                onClick={() => setShowPw((v) => !v)}
-                aria-label={showPw ? "Hide password" : "Show password"}
-              >
-                <EyeIcon open={showPw} />
-              </button>
-            </div>
-          </label>
+            </label>
+          )}
 
           {error && <p className={styles.error}>{error}</p>}
 
           <button type="submit" disabled={loading} className={styles.button}>
-            {loading ? "Signing in…" : "Sign in"}
+            {loading
+              ? "Signing in…"
+              : step === "otp"
+                ? "Verify"
+                : "Sign in"}
           </button>
+
+          {step === "otp" && (
+            <button
+              type="button"
+              className={styles.link}
+              style={{ background: "none", border: "none", cursor: "pointer" }}
+              onClick={() => { setStep("password"); setOtp(""); setError(""); }}
+            >
+              ← Back
+            </button>
+          )}
         </form>
 
         <p className={styles.footer}>

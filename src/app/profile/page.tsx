@@ -8,6 +8,7 @@ import { ChangePasswordSection } from "./ChangePasswordSection";
 import { SignOutBtn } from "./SignOutBtn";
 import { UpdateNameSection } from "./UpdateNameSection";
 import { DeleteAccountSection } from "./DeleteAccountSection";
+import { TwoFactorSection } from "./TwoFactorSection";
 import { safeDecryptPassport } from "@/lib/crypto";
 import styles from "./page.module.css";
 
@@ -24,7 +25,7 @@ export default async function ProfilePage() {
   const [user, profile] = await Promise.all([
     db.user.findUnique({
       where: { id: session.user.id },
-      select: { name: true, email: true, createdAt: true },
+      select: { name: true, email: true, createdAt: true, totpEnabled: true },
     }),
     db.passengerProfile.findUnique({ where: { userId: session.user.id } }),
   ]);
@@ -60,6 +61,11 @@ export default async function ProfilePage() {
         <section className={styles.card}>
           <h2 className={styles.cardTitle}>Password</h2>
           <ChangePasswordSection />
+        </section>
+
+        <section className={styles.card}>
+          <h2 className={styles.cardTitle}>Two-factor authentication</h2>
+          <TwoFactorSection initialEnabled={user?.totpEnabled ?? false} />
         </section>
 
         <section className={styles.card}>
