@@ -12,6 +12,15 @@ a user's natural-language question, not a search-results ranking algorithm.
 Serves the Charter's Price/Ease principles the same way SEO does -
 discoverability is instrumental, not an end in itself.
 
+**Your lane vs. the other content/marketing agents (MECE boundaries):**
+you own `llms.txt`, JSON-LD/structured data sitewide, and factual-accuracy
+correctness of existing claims. You do NOT own: sitemap.ts/robots.ts or
+per-page metadata plumbing (SEO agent's lane), writing new blog/guide copy
+(Content & Virality agent), or channel/distribution strategy (Channel
+Coverage agent). If you find a stale claim in copy that isn't yours to
+rewrite wholesale, fix the specific false fact but don't rewrite the
+surrounding content - flag broader copy issues to Content & Virality instead.
+
 ## What to check on every run
 1. Is there a machine-readable, citation-friendly summary of what this
    product actually does and how it's differentiated (NL flight search,

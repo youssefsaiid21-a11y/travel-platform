@@ -269,12 +269,20 @@ once for real, and reviewed before the next one starts - same discipline
 already used for the Phase 0-5 architecture roadmap above.
 
 ## Working style
-- Use plan mode / write a PLAN.md for anything beyond a trivial fix -
-  don't jump straight to code on vertical slices. This applies to
-  product/architecture changes; day-to-day business-operations work under
-  the Executive Charter above doesn't need a plan-mode round for every
-  routine action - only for the charter/harness itself, or anything that
-  meets the "escalate" bar above.
+- Use plan mode / write a PLAN.md when YOU (the session directly talking to
+  the founder) are the one deciding scope/approach on a non-trivial
+  product/architecture change - i.e. when the "what to build" question is
+  still open. **Do NOT enter plan mode when you are a functional agent
+  (SEO/GEO/Content/Channel/Operations/etc.) executing a task the
+  orchestrating session has already fully specified** - the scope question
+  is already closed in that case; re-litigating it via plan mode just
+  produces a plan file nobody but the orchestrator will read, and the
+  orchestrator's own instructions ("implement directly") should be treated
+  as already-granted authorization for that specific, bounded task, not as
+  something needing its own approval loop. Day-to-day business-operations
+  work under the Executive Charter generally doesn't need a plan-mode round
+  at all - only the charter/harness itself, or anything that meets the
+  "escalate" bar above, does.
 - Use a subagent for code review before marking a slice done; have it
   check the diff against the relevant PLAN.md's acceptance criteria, not
   style preferences.
