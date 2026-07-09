@@ -184,21 +184,18 @@ to confirm again.
   agent stood up as the first functional agent in the roster.
 
 ## Open escalations (nothing autonomous can resolve without founder input)
-- **Switch production `DATABASE_URL` to Neon's pooled endpoint.** Verified
-  working via a real connection test (`ep-curly-king-asy41yg2-pooler...`
-  + `pgbouncer=true&connection_limit=1`, already applied in `.env.local`
-  for local dev). This is the single highest-ranked fix for the "does it
-  survive 100 concurrent users" question - the direct endpoint has no
-  connection pooling and Vercel's serverless fan-out can exhaust it. The
-  harness blocked force-writing this to Production/Preview/Development
-  without a specific confirmation (correctly - it's a live prod credential
-  change). Needs one explicit yes to run
-  `vercel env add DATABASE_URL <env> --force --value <pooled-url> --sensitive -y`
-  across all three environments, then a prod redeploy.
-- **Apply the `WaitlistSignup` migration** to the shared production Neon
-  DB (same approval gate `SupportTicket` went through) - the waitlist
-  feature is fully built and tested but the form will show "Something went
-  wrong" until this lands.
+- **Go-live readiness audit completed 2026-07-09** - see
+  `docs/go-live-checklist.md` (local file, deliberately gitignored - it
+  itemizes real security/compliance/financial gaps and this repo is
+  public, so the details don't belong in version history). Founder should
+  read it before any real launch date is set; every item in it needs a
+  founder/legal/business decision, not autonomous action.
+- **[RESOLVED 2026-07-09]** ~~Switch production `DATABASE_URL` to Neon's
+  pooled endpoint~~ - founder approved via exact-text confirmation;
+  applied across Production/Preview/Development, migration for
+  `WaitlistSignup` applied, prod redeployed, and a real waitlist signup
+  verified end-to-end against the live pooled DB afterward. Do not
+  re-attempt this action or re-flag it as pending - it's done.
 - **Optional: a real concurrency test before launch day.** The harness
   correctly blocked running a 100-connection stress test directly against
   the live production DB (real outage risk). Once the pooled-endpoint
