@@ -64,21 +64,40 @@ describe("proxy CSP", () => {
 });
 
 describe("proxy channel attribution", () => {
-  it("sets an orbi_channel cookie when utm_source is present", () => {
-    const res = proxy(makeReq("/?utm_source=producthunt"));
+  it("sets an orbi_channel cookie when utm_source is present and the visitor has consented", () => {
+    const req = makeReq("/?utm_source=producthunt");
+    req.cookies.set("orbi_cookie_consent", "accepted");
+    const res = proxy(req);
     const setCookie = res.headers.get("set-cookie") ?? "";
     expect(setCookie).toContain("orbi_channel=producthunt");
   });
 
   it("does not set a channel cookie when there's no utm_source", () => {
-    const res = proxy(makeReq("/"));
+    const req = makeReq("/");
+    req.cookies.set("orbi_cookie_consent", "accepted");
+    const res = proxy(req);
     const setCookie = res.headers.get("set-cookie") ?? "";
     expect(setCookie).not.toContain("orbi_channel");
   });
 
   it("does not overwrite an existing orbi_channel cookie (first-touch attribution)", () => {
     const req = makeReq("/?utm_source=twitter");
+    req.cookies.set("orbi_cookie_consent", "accepted");
     req.cookies.set("orbi_channel", "reddit");
+    const res = proxy(req);
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    expect(setCookie).not.toContain("orbi_channel");
+  });
+
+  it("does not set a channel cookie without cookie consent, even with utm_source present", () => {
+    const res = proxy(makeReq("/?utm_source=producthunt"));
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    expect(setCookie).not.toContain("orbi_channel");
+  });
+
+  it("does not set a channel cookie when consent was explicitly declined", () => {
+    const req = makeReq("/?utm_source=producthunt");
+    req.cookies.set("orbi_cookie_consent", "declined");
     const res = proxy(req);
     const setCookie = res.headers.get("set-cookie") ?? "";
     expect(setCookie).not.toContain("orbi_channel");

@@ -1,0 +1,53 @@
+.banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  background: var(--surface-solid);
+  border-top: 1px solid var(--border-solid);
+  box-shadow: var(--shadow-lg);
+}
+
+.text {
+  flex: 1 1 320px;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.decline {
+  padding: 10px 16px;
+  border: 1px solid var(--border-solid);
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--text-2);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.accept {
+  padding: 10px 16px;
+  border: none;
+  border-radius: var(--r-md);
+  background: var(--gradient-accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+}

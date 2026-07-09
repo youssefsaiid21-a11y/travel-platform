@@ -63,9 +63,15 @@ export default auth((req) => {
   // First-touch channel attribution (Channel Coverage agent's mandate: know
   // which acquisition channel is actually driving traffic). Only set on
   // first visit - a later utm_source-less page view shouldn't overwrite the
-  // channel that originally brought this visitor in.
+  // channel that originally brought this visitor in. Non-essential (purely
+  // marketing attribution, no functional purpose), so it's gated on explicit
+  // cookie consent (see CookieConsentBanner) rather than set unconditionally -
+  // a visitor who hasn't consented yet, or who declined, gets none of this
+  // even though it costs some attribution accuracy for very-first-request
+  // conversions before a consent decision exists.
   const utmSource = req.nextUrl.searchParams.get("utm_source");
-  if (utmSource && !req.cookies.get("orbi_channel")) {
+  const hasConsent = req.cookies.get("orbi_cookie_consent")?.value === "accepted";
+  if (utmSource && hasConsent && !req.cookies.get("orbi_channel")) {
     response.cookies.set("orbi_channel", utmSource, {
       maxAge: 60 * 60 * 24 * 30,
       sameSite: "lax",

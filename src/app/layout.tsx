@@ -5,6 +5,7 @@ import { SessionProvider } from "next-auth/react";
 import { Analytics } from "@vercel/analytics/next";
 import { auth } from "@/auth";
 import NavBar from "@/components/NavBar";
+import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -77,6 +78,7 @@ export default async function RootLayout({
             <ViewTransition>{children}</ViewTransition>
           </div>
         </SessionProvider>
+        <CookieConsentBanner />
         <Analytics />
       </body>
     </html>
