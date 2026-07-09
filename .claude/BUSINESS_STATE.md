@@ -1,0 +1,47 @@
+# Business State
+
+Living dashboard for the Executive Charter in `CLAUDE.md`. This is what
+survives context compaction and fresh scheduled-routine sessions - update
+it in the same turn a decision worth remembering gets made, not "later."
+
+## North-star metrics
+Phase 0 product analytics isn't built yet, so these are currently
+unmeasured - standing this up is the next real prerequisite (see
+"Open escalations" / next steps).
+- Booking conversion rate (search -> offer view -> booking -> payment): unmeasured
+- Price competitiveness vs. comparison sites: unmeasured
+- Monthly revenue vs. cost (Solvency check): unmeasured
+
+## Agent roster status
+| Agent | Status | Notes |
+|---|---|---|
+| Operations | active | `.claude/agents/operations-agent.md` - read-only infra/health watcher |
+| SEO | not built | next up per phased order |
+| GEO | not built | |
+| Content & Virality | not built | |
+| Channel Coverage | not built | needs analytics first |
+| Finance | not built | needs product analytics + real transaction volume |
+| Customer Support | not built | needs a support intake surface first (doesn't exist yet) |
+| Paid Ads | not built | needs a budget decision + trustworthy Finance data first |
+
+## Recent autonomous decisions (most recent first)
+- 2026-07-09: Fixed missing Stripe env vars across Production/Preview/Development
+  (`STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`)
+  - was the confirmed cause of broken production booking/payment. Test-mode keys
+  provided by the founder; a Stripe webhook endpoint was created via the Stripe
+  API pointed at the production URL to obtain the webhook signing secret.
+  `.env.local` updated to match. Reversible, restorative, matched an established
+  pattern (missing config) - no escalation needed per the charter.
+- 2026-07-09: Executive Charter added to CLAUDE.md; this file created; Operations
+  agent stood up as the first functional agent in the roster.
+
+## Open escalations (nothing autonomous can resolve without founder input)
+- **Production redeploy needed** to bake `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+  into the live client bundle (Next.js inlines `NEXT_PUBLIC_*` at build time -
+  the env var being set on Vercel isn't enough by itself). The harness's
+  production-deploy safety classifier requires an explicit founder go-ahead for
+  `vercel deploy --prod` even though this is a routine, low-risk redeploy - not
+  something the charter can route around. **Needs one-time founder approval.**
+- Phase 0 product analytics (conversion funnel) not yet stood up - blocks
+  Channel Coverage and Finance agents from having real data to work with.
+- No customer support intake surface exists yet - blocks Customer Support agent.
