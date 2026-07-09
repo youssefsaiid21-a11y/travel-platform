@@ -115,3 +115,24 @@ model TrackedSearch {
   @@index([userId, createdAt])
   @@index([departureDate])
 }
+
+// Support intake, built for the Customer Support agent (see
+// .claude/agents/customer-support-agent.md and CLAUDE.md's Executive
+// Charter). No relation to User is required - support requests can arrive
+// before signup or from a guest browsing session, so email is captured
+// directly on the ticket rather than requiring a logged-in userId.
+model SupportTicket {
+  id         String   @id @default(cuid())
+  email      String
+  subject    String
+  message    String
+  // Booking reference, if the request is about an existing booking - not a
+  // foreign key, since a ticket should still be storable even if the
+  // reference is mistyped or belongs to a since-deleted row.
+  bookingRef String?
+  status     String   @default("open")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([status, createdAt])
+}

@@ -17,6 +17,12 @@ export default function NavBar() {
         <OrbiWordmark />
       </Link>
       <div className={styles.right}>
+        <Link
+          href="/support"
+          className={`${styles.link} ${pathname === "/support" ? styles.linkActive : ""}`}
+        >
+          Support
+        </Link>
         {session?.user ? (
           <>
             <Link
