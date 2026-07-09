@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { GUIDES, getGuide } from "@/lib/guides";
+import { WaitlistForm } from "@/components/WaitlistForm";
 import styles from "./page.module.css";
 
 export function generateStaticParams() {
@@ -44,6 +45,8 @@ export default async function GuidePage({
           <p key={i}>{paragraph}</p>
         ))}
       </div>
+
+      <WaitlistForm />
     </div>
   );
 }

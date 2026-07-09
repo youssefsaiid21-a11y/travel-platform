@@ -136,3 +136,14 @@ model SupportTicket {
 
   @@index([status, createdAt])
 }
+
+// Pre-launch, low-commitment interest capture - organic/GEO/content readers
+// who aren't ready for a full account signup yet. `channel` records the
+// first-touch attribution cookie (src/lib/channel.ts) so we know which
+// launch-day channel actually drove signups once real traffic exists.
+model WaitlistSignup {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  channel   String   @default("direct")
+  createdAt DateTime @default(now())
+}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { FLIGHT_GUIDES, getFlightGuide } from "@/lib/flightGuides";
 import { getBaseUrl } from "@/lib/site";
+import { WaitlistForm } from "@/components/WaitlistForm";
 import styles from "./page.module.css";
 
 export function generateStaticParams() {
@@ -102,6 +103,10 @@ export default async function FlightGuidePage({
           </div>
         ))}
       </dl>
+
+      <WaitlistForm
+        label={`Not ready to book your ${guide.originCity} to ${guide.destinationCity} flight yet? Get notified about fare drops on this route.`}
+      />
     </div>
   );
 }
