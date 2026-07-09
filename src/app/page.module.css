@@ -586,7 +586,73 @@
   border-color: var(--border);
 }
 
-/* ── Input form ── */
+/* ── Hero search bar (empty state - big and centered, not tucked at the bottom) ── */
+.heroFormWrapper {
+  width: 100%;
+  max-width: 640px;
+  margin-top: 1.75rem;
+}
+
+.heroForm {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--r-full);
+  padding: 0.6rem 0.6rem 0.6rem 1.75rem;
+  backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: var(--shadow-xl), var(--shadow-glow);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.heroForm:focus-within {
+  border-color: rgba(2, 132, 199, 0.45);
+  transform: scale(1.01);
+}
+
+.heroInput {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--text-1);
+  min-width: 0;
+}
+
+.heroInput::placeholder {
+  color: var(--text-3);
+}
+
+.heroButton {
+  padding: 0.9rem 1.75rem;
+  background: var(--gradient-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-full);
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s, transform 0.15s;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.4);
+}
+
+.heroButton:hover:not(:disabled) {
+  opacity: 0.88;
+  transform: scale(1.02);
+}
+
+.heroButton:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ── Input form (in-conversation - compact, pinned to the bottom) ── */
 .formWrapper {
   padding: 0.75rem 0 1.25rem;
   position: sticky;

@@ -435,6 +435,45 @@ export default function Home() {
    -1
   );
 
+  const searchForm = (
+    <form
+      className={hasSearched ? styles.form : styles.heroForm}
+      onSubmit={(e) => {
+        e.preventDefault();
+        sendMessage(input);
+      }}
+    >
+      <input
+        ref={inputRef}
+        className={hasSearched ? styles.input : styles.heroInput}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        placeholder={
+          hasSearched
+            ? "Refine search or ask something new…"
+            : "Where do you want to fly?"
+        }
+        disabled={loading}
+        autoFocus
+        autoComplete="off"
+        spellCheck={false}
+        maxLength={400}
+        title="Press / to focus search"
+        aria-label="Flight search"
+      />
+      {!input && !loading && (
+        <span className={styles.enterHint} aria-hidden="true" title="Press Enter to search">↵</span>
+      )}
+      <button
+        type="submit"
+        className={hasSearched ? styles.button : styles.heroButton}
+        disabled={loading || !input.trim()}
+      >
+        {loading ? "Searching…" : "Search"}
+      </button>
+    </form>
+  );
+
   return (
     <div className={styles.page}>
       <main className={styles.messages} aria-label="Flight search results" aria-live="off" aria-busy={loading}>
@@ -445,6 +484,14 @@ export default function Home() {
             <p className={styles.heroSub}>
               Save your details once - book any flight in under a minute, for life.
             </p>
+            <div className={styles.heroFormWrapper}>
+              {searchForm}
+              {input.length >= 280 && (
+                <p className={styles.charWarning}>
+                  {input.length} chars - try to keep queries concise for best results
+                </p>
+              )}
+            </div>
             <div className={styles.examples}>
               {EXAMPLE_QUERIES.map((q) => (
                 <button
@@ -704,65 +751,32 @@ export default function Home() {
         {statusMsg || (loading ? "Searching for flights" : "")}
       </div>
 
-      <div className={styles.formWrapper}>
-        {hasSearched && !loading && (
-          <div className={styles.newSearchRow}>
-            <button
-              className={styles.newSearchBtn}
-              onClick={() => {
-                setMessages([]);
-                setSessionId(undefined);
-                setInput("");
-                try { sessionStorage.removeItem("orbi_session_id"); } catch { /* ignore */ }
-                setTimeout(() => inputRef.current?.focus(), 50);
-              }}
-            >
-              ↩ New search
-            </button>
-          </div>
-        )}
-        {input.length >= 280 && (
-          <p className={styles.charWarning}>
-            {input.length} chars - try to keep queries concise for best results
-          </p>
-        )}
-        <form
-          className={styles.form}
-          onSubmit={(e) => {
-            e.preventDefault();
-            sendMessage(input);
-          }}
-        >
-          <input
-            ref={inputRef}
-            className={styles.input}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={
-              hasSearched
-                ? "Refine search or ask something new…"
-                : "Where do you want to fly?"
-            }
-            disabled={loading}
-            autoFocus
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={400}
-            title="Press / to focus search"
-            aria-label="Flight search"
-          />
-          {!input && !loading && (
-            <span className={styles.enterHint} aria-hidden="true" title="Press Enter to search">↵</span>
+      {hasSearched && (
+        <div className={styles.formWrapper}>
+          {!loading && (
+            <div className={styles.newSearchRow}>
+              <button
+                className={styles.newSearchBtn}
+                onClick={() => {
+                  setMessages([]);
+                  setSessionId(undefined);
+                  setInput("");
+                  try { sessionStorage.removeItem("orbi_session_id"); } catch { /* ignore */ }
+                  setTimeout(() => inputRef.current?.focus(), 50);
+                }}
+              >
+                ↩ New search
+              </button>
+            </div>
           )}
-          <button
-            type="submit"
-            className={styles.button}
-            disabled={loading || !input.trim()}
-          >
-            {loading ? "Searching…" : "Search"}
-          </button>
-        </form>
-      </div>
+          {input.length >= 280 && (
+            <p className={styles.charWarning}>
+              {input.length} chars - try to keep queries concise for best results
+            </p>
+          )}
+          {searchForm}
+        </div>
+      )}
     </div>
   );
 
