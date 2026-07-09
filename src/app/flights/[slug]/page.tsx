@@ -82,7 +82,7 @@ export default async function FlightGuidePage({
         {guide.originCity} to {guide.destinationCity} flights
       </h1>
       <p className={styles.route}>
-        {guide.originAirport} ({guide.origin}) &rarr; {guide.destinationAirport} ({guide.destination})
+        {guide.originAirport} &rarr; {guide.destinationAirport}
       </p>
       <p className={styles.intro}>{guide.intro}</p>
 
@@ -90,7 +90,7 @@ export default async function FlightGuidePage({
         href={`/?q=${encodeURIComponent(guide.query)}`}
         className={styles.cta}
       >
-        Search {guide.originCity} to {guide.destinationCity} flights &rarr;
+        {`Search ${guide.originCity} to ${guide.destinationCity} flights`} &rarr;
       </Link>
 
       <h2 className={styles.faqTitle}>Frequently asked questions</h2>
