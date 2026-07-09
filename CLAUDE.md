@@ -268,6 +268,44 @@ Channel Coverage -> Finance (read-only) -> Customer Support (draft-only)
 once for real, and reviewed before the next one starts - same discipline
 already used for the Phase 0-5 architecture roadmap above.
 
+### Parallel agent protocol (learned the hard way - 2026-07-09)
+Dispatching the SEO/GEO/Content/Channel agents fully in parallel from the
+same base commit produced real, silent regressions: two branches
+independently rewrote `sitemap.ts` (one reverting the other's live-domain
+fix and dropping its flight-guide URLs), and two branches independently
+rewrote `layout.tsx` (one reverting the other's JSON-LD and a corrected
+airline-count stat). None of this showed up in any single branch's own
+review gate - each branch tested clean in isolation. It only surfaces when
+you diff sibling branches against each other, which nothing was doing.
+Rules going forward:
+1. **Foundation before fan-out.** If multiple agents will plausibly touch
+   the same "hub" file (`sitemap.ts`, `layout.tsx`'s metadata block,
+   `robots.ts`), do that shared foundation work first, sequentially, merge
+   it to `main`, and only THEN fork parallel agents from the updated base.
+   Don't parallelize agents whose file footprints you haven't checked for
+   overlap first - a 30-second `git diff --stat` prediction is cheaper
+   than reconciling four divergent branches after the fact.
+2. **Prefer data-file extension over hub-file editing.** An agent that
+   needs a new sitemap entry or landing page should add to an imported data
+   array (see `FLIGHT_GUIDES`/`GUIDES` pattern) rather than hand-editing
+   the hub file's body - reduces the odds of two agents' edits colliding
+   on the same lines even when they do run in parallel.
+3. **Rebase before merge, always.** Before merging any agent branch,
+   rebase it onto the current tip of `main` (not the commit it forked
+   from) and re-run the full review gate on the rebased result. A branch
+   that hasn't been rebased since other work landed on `main` is not safe
+   to merge, no matter how clean its own isolated CI run looked.
+4. **Integration-level testing, not just per-branch.** Passing tests on
+   four separate branches doesn't demonstrate the merged whole works -
+   run the full suite again on `main` after each merge, before moving to
+   the next one.
+5. **Clean up agent worktrees immediately after extracting their work**
+   (`git worktree remove --force`, then `git worktree prune`, then check
+   `git branch` for stray `worktree-agent-*` branches) - a leftover
+   `.claude/worktrees/*` directory contains its own `src/__tests__/` tree
+   that `npm test`'s globbing picks up, producing spurious failures from
+   stale/parallel-universe code that look like real regressions.
+
 ## Working style
 - Use plan mode / write a PLAN.md when YOU (the session directly talking to
   the founder) are the one deciding scope/approach on a non-trivial
