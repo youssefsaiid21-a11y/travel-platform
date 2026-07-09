@@ -17,15 +17,48 @@ exists and will populate from here on.
 | Agent | Status | Notes |
 |---|---|---|
 | Operations | active | `.claude/agents/operations-agent.md` - read-only infra/health watcher |
-| SEO | built, first pass run | `.claude/agents/seo-agent.md` - see branch `agents/seo-first-pass` |
-| GEO | built, first pass run | `.claude/agents/geo-agent.md` - see branch `agents/geo-first-pass` |
-| Content & Virality | built, first pass run | `.claude/agents/content-virality-agent.md` - see branch `agents/content-virality-first-pass` |
-| Channel Coverage | built, first pass run | `.claude/agents/channel-coverage-agent.md` - see branch `agents/channel-coverage-first-pass` |
+| SEO | built, first pass run | `.claude/agents/seo-agent.md` - PR #2 (`agents/seo-first-pass`), open for review |
+| GEO | built, first pass run | `.claude/agents/geo-agent.md` - PR #1 (`agents/geo-first-pass`), open for review |
+| Content & Virality | built, first pass run | `.claude/agents/content-virality-agent.md` - PR #3 (`agents/content-virality-first-pass`), open for review |
+| Channel Coverage | built, first pass run | `.claude/agents/channel-coverage-agent.md` - PR #4 (`agents/channel-coverage-first-pass`), open for review |
 | Finance | drafted, NOT activated | `.claude/agents/finance-agent.md` - read-only by design; needs explicit founder review of this exact prompt before first real run |
-| Customer Support | code complete, NOT live | `.claude/agents/customer-support-agent.md` not yet written; `/support` page + API route built, blocked on the SupportTicket migration being applied to prod |
+| Customer Support | agent defined, feature blocked | `.claude/agents/customer-support-agent.md` written (draft-only, never auto-sends); `/support` page + API route built on `main`, non-functional until the SupportTicket migration is approved |
 | Paid Ads | drafted, NOT activated | `.claude/agents/paid-ads-agent.md` - no live write access designed in; needs a founder budget decision + prompt review before first real run |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-09: Full business-ops build-out session, capped with a production
+  deploy of everything merged to `main`. Summary of what shipped:
+  (1) Vercel Analytics + funnel tracking; (2) Customer Support intake code
+  (migration pending approval); (3) all 8 agent definitions written
+  (Operations active; SEO/GEO/Content/Channel ran real first passes, output
+  on PRs #1-4 for review since they're propose-only per the Charter;
+  Finance/Customer-Support/Paid-Ads drafted, gated on founder review/budget
+  before first real activation); (4) root-caused and fixed why every
+  spawned functional agent kept entering its own plan mode (CLAUDE.md's
+  Working Style told every session to plan for "anything beyond a trivial
+  fix" - didn't distinguish "you're deciding scope" from "you're executing
+  an already-specified task"); (5) sharpened MECE boundaries across the 4
+  content/marketing agents after a real overlap (SEO nearly duplicated
+  GEO's JSON-LD work); (6) broadened `.claude/settings.json` permissions
+  twice more after repeated founder feedback that prompts were still too
+  frequent - each widening needed the founder's exact-text sign-off per the
+  harness's self-modification rule, which cannot be pre-authorized by a
+  general instruction no matter how it's phrased.
+  Operational lesson: background agents running in isolated worktrees can
+  leave `.claude/worktrees/*` directories behind that get picked up by
+  `npm test`'s file globbing and produce spurious failures from stale/
+  parallel-universe code - run `git worktree list` and prune before trusting
+  a "tests are failing" signal if agent worktrees were used this session.
+  One stray agent also resurfaced mid-session after its worktree had
+  already been cleaned up once (harness apparently persists/resumes agent
+  state independent of the worktree directory) - had to be explicitly told
+  to stop and discard its redundant work.
+  Flagged for founder review before merging PR #2 (SEO): `flightGuides.ts`'s
+  FAQ content makes visa/entry-requirement claims (e.g. UK->US ESTA) -
+  already hedged ("requirements change, always check current rules") but
+  still a customer-facing legal/policy-adjacent claim worth a second look
+  per the Charter's escalation category, not something to wave through
+  unreviewed just because it's hedged.
 - 2026-07-09: Deployed to production (review gate passed: tests/lint/typecheck
   clean, no Duffel/payment/UI diff since last deploy) and verified live via
   claude-in-chrome: real search -> real Duffel sandbox offers -> booking form ->
