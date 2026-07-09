@@ -279,3 +279,11 @@ already used for the Phase 0-5 architecture roadmap above.
   check the diff against the relevant PLAN.md's acceptance criteria, not
   style preferences.
 - Show evidence of done (test output, not just an assertion).
+- Any change with a user-facing/runtime surface (UI, an API response a
+  user would notice, anything touching headers/middleware/auth) must be
+  verified with real browser interaction via the claude-in-chrome
+  extension before being called done or deployed - passing automated
+  tests is not sufficient evidence by itself. Precedent: a CSP header
+  change once passed lint/typecheck/tests/build cleanly while silently
+  breaking all client-side interactivity in production - only driving it
+  in an actual browser caught that.
