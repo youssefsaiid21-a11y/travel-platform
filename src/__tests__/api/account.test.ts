@@ -80,6 +80,8 @@ describe("DELETE /api/account", () => {
         email: `deleted-${USER_ID}@deleted.orbi.invalid`,
         name: null,
         tokenVersion: { increment: 1 },
+        totpSecret: null,
+        totpEnabled: false,
       }),
     });
     // The replacement password hash must not just be some fixed sentinel

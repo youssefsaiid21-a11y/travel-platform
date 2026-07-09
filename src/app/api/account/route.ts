@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
+import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -62,6 +63,14 @@ export async function DELETE(req: NextRequest) {
       name: null,
       passwordHash: unusableHash,
       tokenVersion: { increment: 1 },
+      // Written before MFA existed and never updated - a "deleted" account
+      // was still leaving its TOTP secret and backup-code hashes in the DB
+      // indefinitely. Not exploitable on its own (the password above is
+      // already unusable), but real cryptographic secrets tied to an
+      // anonymized person shouldn't just sit there.
+      totpSecret: null,
+      totpEnabled: false,
+      backupCodes: Prisma.JsonNull,
     },
   });
 
