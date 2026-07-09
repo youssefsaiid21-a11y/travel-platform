@@ -11,6 +11,10 @@ import { passengerValidationError } from "@/lib/passengerValidation";
 import { sendBookingConfirmations } from "@/lib/notifications";
 import { track } from "@vercel/analytics/server";
 
+// Duffel order creation + Stripe payment intent handling can each take a
+// few seconds; give this route enough headroom to not get cut off mid-request.
+export const maxDuration = 30;
+
 function isUniqueConstraintError(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
 }

@@ -37,9 +37,9 @@
 .cta {
   display: inline-block;
   font-weight: 600;
-  color: white;
+  color: #fff;
   background: var(--gradient-accent);
-  border-radius: 999px;
+  border-radius: var(--r-full);
   padding: 12px 22px;
   text-decoration: none;
   margin-bottom: 40px;

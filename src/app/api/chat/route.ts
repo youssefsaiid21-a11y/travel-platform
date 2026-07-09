@@ -10,6 +10,11 @@ import type { NormalizedOffer } from "@/lib/duffel/types";
 import type { ExploreDestinationResult, ExploreParams, SearchParams } from "@/lib/parser/types";
 import { track } from "@vercel/analytics/server";
 
+// Parses (LLM) + Duffel search + price calendar can each take up to the
+// client-level 10s timeout; give this route enough headroom to not get cut
+// off mid-request by the platform default before those calls even finish.
+export const maxDuration = 30;
+
 export interface ChatRequest {
   message: string;
   session_id?: string;

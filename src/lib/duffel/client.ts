@@ -78,6 +78,7 @@ export async function duffelRequest<T>(
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
+    signal: AbortSignal.timeout(10_000),
   });
 
   const json = await res.json();

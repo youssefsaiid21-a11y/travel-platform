@@ -4,6 +4,7 @@ import type { ConversationMessage, ExploreParams, SearchParams } from "./types";
 const client = new OpenAI({
   apiKey: process.env.ZHIPU_API_KEY ?? "",
   baseURL: "https://api.z.ai/api/paas/v4/",
+  timeout: 10_000,
 });
 
 const MODEL = "glm-4-32b-0414-128k";
