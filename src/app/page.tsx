@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { OfferList } from "@/components/OfferList";
 import { OfferCardSkeleton } from "@/components/OfferCard";
@@ -135,6 +135,7 @@ const STEP_LABELS: Record<string, string> = {
 
 export default function Home() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -153,6 +154,15 @@ export default function Home() {
   // error #418) for any returning visitor with non-empty storage.
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Prefills the search box from a /flights/[slug] landing page's CTA
+    // (?q=...) - not auto-submitted, the user still confirms by pressing
+    // search, consistent with the checkpoint-confirm flow elsewhere.
+    const q = searchParams.get("q");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reading a URL param after mount, not syncing a prop/render value
+    if (q) setInput(q);
+  }, [searchParams]);
 
   useEffect(() => {
     try {

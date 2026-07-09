@@ -1,0 +1,73 @@
+.container {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 40px 20px 64px;
+}
+
+.breadcrumb {
+  font-size: 0.85rem;
+  color: var(--text-3);
+  margin-bottom: 16px;
+}
+
+.breadcrumb a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-1);
+  margin: 0 0 8px;
+}
+
+.route {
+  color: var(--text-2);
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+
+.intro {
+  color: var(--text-2);
+  line-height: 1.6;
+  margin: 0 0 24px;
+}
+
+.cta {
+  display: inline-block;
+  font-weight: 600;
+  color: white;
+  background: var(--gradient-accent);
+  border-radius: 999px;
+  padding: 12px 22px;
+  text-decoration: none;
+  margin-bottom: 40px;
+}
+
+.faqTitle {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-1);
+  margin: 0 0 16px;
+}
+
+.faqList {
+  margin: 0;
+}
+
+.faqItem {
+  margin-bottom: 20px;
+}
+
+.faqQ {
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 4px;
+}
+
+.faqA {
+  color: var(--text-2);
+  line-height: 1.6;
+  margin: 0;
+}
