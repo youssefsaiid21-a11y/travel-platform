@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test*)",
+      "Bash(npm run lint*)",
+      "Bash(npm run dev*)",
+      "Bash(npx tsc *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(vercel env ls*)",
+      "Bash(vercel env pull*)",
+      "Bash(gh pr view*)",
+      "Bash(gh pr list*)",
+      "Bash(gh run list*)",
+      "Bash(gh run view*)",
+      "Bash(gh api repos/*/pulls/*/comments)"
+    ]
+  },
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Bash: `vercel env add/rm/pull` for non-live, non-guardrail env vars (e.g. STRIPE_SECRET_KEY/NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY/STRIPE_WEBHOOK_SECRET in test mode, DATABASE_URL, CRON_SECRET, notification-provider keys) on the travel-platform Vercel project, across Production/Preview/Development, is allowed without an extra confirmation prompt. This project's CLAUDE.md 'Executive Charter' section explicitly classifies routine, reversible env-var fixes matching an established pattern as autonomous (act and log it in .claude/BUSINESS_STATE.md, don't ask first). This does NOT cover flipping any Duffel/Stripe credential to live/production mode, or writing any secret that isn't a straightforward env var value for an already-integrated service.",
+      "Bash: `vercel deploy --prod` for the travel-platform project is allowed without an extra confirmation prompt ONLY after a review gate has been completed in the same turn/session first: `npm test`, `npm run lint`, and `npx tsc --noEmit` all passing, plus - if the diff since the last deploy touches Duffel/order/payment/secret-handling code - the `booking-safety-reviewer` subagent reporting no gaps against CLAUDE.md's 5 hard guardrails. If any of those checks weren't run, weren't clean, or the diff touches a hard guardrail and hasn't been reviewed, this rule does not apply and the deploy must still be confirmed with the founder. When the review gate is satisfied, treat the deploy itself as autonomous and reversible (Vercel deploys can be rolled back) - deploy without asking, then log what was deployed and the review evidence in .claude/BUSINESS_STATE.md."
+    ]
+  }
+}
