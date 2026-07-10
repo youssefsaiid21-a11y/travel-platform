@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import styles from "./CookieConsentBanner.module.css";
 
 function getConsentCookie(): string | null {
@@ -19,11 +19,16 @@ function setConsentCookie(value: "accepted" | "declined") {
 // sets, and it's gated on this consent choice.
 export function CookieConsentBanner() {
   const [visible, setVisible] = useState(false);
+  const bannerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!getConsentCookie()) setVisible(true);
   }, []);
+
+  useEffect(() => {
+    if (visible) bannerRef.current?.focus();
+  }, [visible]);
 
   if (!visible) return null;
 
@@ -32,8 +37,23 @@ export function CookieConsentBanner() {
     setVisible(false);
   }
 
+  // Escape is treated as a real consent decision (decline non-essential),
+  // not a no-op dismissal - matches the Decline button, so the choice is
+  // actually recorded rather than just hiding the banner for this session.
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Escape") handleChoice("declined");
+  }
+
   return (
-    <div className={styles.banner} role="dialog" aria-label="Cookie consent">
+    <div
+      ref={bannerRef}
+      className={styles.banner}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Cookie consent"
+      tabIndex={-1}
+      onKeyDown={handleKeyDown}
+    >
       <p className={styles.text}>
         We use a strictly-necessary cookie to keep you signed in. We&apos;d also
         like to set a cookie that remembers how you found Orbi (e.g. Product

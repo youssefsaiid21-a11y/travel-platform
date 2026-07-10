@@ -43,4 +43,16 @@ describe("CookieConsentBanner", () => {
     expect(document.cookie).toContain("orbi_cookie_consent=declined");
     expect(screen.queryByRole("dialog", { name: "Cookie consent" })).toBeNull();
   });
+
+  it("moves focus to the dialog when it appears", () => {
+    render(<CookieConsentBanner />);
+    expect(document.activeElement).toBe(screen.getByRole("dialog", { name: "Cookie consent" }));
+  });
+
+  it("treats Escape as a decline decision", () => {
+    render(<CookieConsentBanner />);
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Cookie consent" }), { key: "Escape" });
+    expect(document.cookie).toContain("orbi_cookie_consent=declined");
+    expect(screen.queryByRole("dialog", { name: "Cookie consent" })).toBeNull();
+  });
 });

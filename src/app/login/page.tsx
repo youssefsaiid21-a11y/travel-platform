@@ -145,7 +145,11 @@ export default function LoginPage() {
             </label>
           )}
 
-          {error && <p className={styles.error}>{error}</p>}
+          <div aria-live="polite" className={styles.srOnly}>
+            {step === "otp" ? "Two-factor authentication required" : ""}
+          </div>
+
+          {error && <p className={styles.error} aria-live="polite">{error}</p>}
 
           <button type="submit" disabled={loading} className={styles.button}>
             {loading

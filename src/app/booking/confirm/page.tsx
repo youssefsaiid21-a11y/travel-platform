@@ -349,6 +349,10 @@ export default function ConfirmPage() {
   const canProceed =
     !expiry.expired &&
     (isQuickBook ? extrasAreValid() : primaryIsValid() && extrasAreValid());
+  const validationMessage = isQuickBook
+    ? extraPassengers.map((p) => passengerValidationError(p, todayStr)).find(Boolean) ?? null
+    : passengerValidationError(form, todayStr) ??
+      extraPassengers.map((p) => passengerValidationError(p, todayStr)).find(Boolean) ?? null;
 
   return (
     <div className={styles.page}>
@@ -678,10 +682,15 @@ export default function ConfirmPage() {
 
             {payError && <p className={styles.error}>{payError}</p>}
 
+            <div id="proceed-validation" aria-live="polite" className={styles.srOnly}>
+              {!loadingIntent && !canProceed ? validationMessage : ""}
+            </div>
+
             <button
               className={styles.proceedButton}
               onClick={handleProceed}
               disabled={loadingIntent || !canProceed}
+              aria-describedby={!canProceed ? "proceed-validation" : undefined}
             >
               {loadingIntent
                 ? "Preparing payment…"
