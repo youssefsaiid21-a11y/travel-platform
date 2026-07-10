@@ -164,6 +164,22 @@ land instead of letting it go stale the way the old scope note did.
   script predated the Phase 3 checkpoint gate and would have failed on
   every single nightly run, not just on real drift - fixed before this
   was ever relied on.)
+- **Phase 4b (process) - DONE, added 2026-07-10:** this repo deploys via an
+  explicit `vercel deploy --prod`, not automatically on push/merge - a real
+  gap surfaced the same day: several features (account recovery, the admin
+  surface, a11y fixes, logo/favicon fixes) sat committed, tested, and
+  pushed to `main` for hours while production kept serving an older build,
+  undetected until an unrelated task happened to check a live deployment.
+  `.github/workflows/check-deploy-freshness.yml` now runs
+  `scripts/check-deploy-freshness.mjs` every 2 hours plus on manual
+  dispatch - compares `GITHUB_SHA` (latest commit on `main`) against
+  `GET /api/version`'s `commit` field (reads `VERCEL_GIT_COMMIT_SHA`, a
+  Vercel system env var) on the live deployment, failing loudly if they
+  don't match. No custom alerting - relies on GitHub's own
+  failed-scheduled-workflow notification, same as `smoke-test.yml`. Requires
+  "Automatically expose System Environment Variables" enabled in Vercel
+  project settings for `/api/version` to return a real commit instead of
+  `null`.
 - **Phase 5 (code done, migration NOT yet applied to prod):** migrated
   `Booking.offerSnapshot`/`searchParams`/`passengerNames` and
   `TrackedSearch.passengers` from hand-serialized `String` JSON to native

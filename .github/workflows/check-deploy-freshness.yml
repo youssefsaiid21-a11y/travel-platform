@@ -1,0 +1,27 @@
+name: Check deploy freshness
+
+# Confirms the live deployment matches the latest commit on main. This repo
+# deploys via an explicit `vercel deploy --prod`, not automatically on
+# push (unlike ci.yml/smoke-test.yml, which just verify the code itself) -
+# see scripts/check-deploy-freshness.mjs for why this exists. Runs every 2
+# hours rather than daily like the smoke test: this check is a single cheap
+# HTTP GET (no real API costs), so there's no reason to let staleness sit
+# for up to a day before catching it.
+on:
+  schedule:
+    - cron: "0 */2 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  check-deploy-freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: node scripts/check-deploy-freshness.mjs
+        env:
+          SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL || 'https://travel-platform-ashy.vercel.app' }}
