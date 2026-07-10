@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { OrbiWordmark } from "@/components/OrbiLogo";
 import styles from "./page.module.css";
 
 function EyeIcon({ open }: { open: boolean }) {
@@ -60,18 +61,7 @@ export default function ResetPasswordPage() {
     <div className={styles.container}>
       <div className={styles.card}>
         <div className={styles.brand}>
-          <svg className={styles.brandIcon} width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-            <circle cx="14" cy="14" r="13" stroke="url(#lg4)" strokeWidth="1.5"/>
-            <ellipse cx="14" cy="14" rx="13" ry="5.5" stroke="url(#lg4)" strokeWidth="1.5" opacity="0.5"/>
-            <circle cx="14" cy="5" r="2" fill="url(#lg4)"/>
-            <defs>
-              <linearGradient id="lg4" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#0284c7"/>
-                <stop offset="1" stopColor="#06b6d4"/>
-              </linearGradient>
-            </defs>
-          </svg>
-          <div className={styles.logo}>Orbi</div>
+          <OrbiWordmark className={styles.logo} />
         </div>
         <h1 className={styles.title}>Choose a new password</h1>
         <p className={styles.subtitle}>
