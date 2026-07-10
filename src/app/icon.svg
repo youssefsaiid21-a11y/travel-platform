@@ -7,13 +7,13 @@
   </defs>
   <!-- Rounded square background -->
   <rect width="32" height="32" rx="8" fill="url(#bg)"/>
-  <!-- Orbit ellipse tilted 35deg -->
-  <ellipse cx="16" cy="16" rx="9.5" ry="5"
-           stroke="white" stroke-width="1.5" fill="none" stroke-opacity="0.55"
-           transform="rotate(-35 16 16)"/>
-  <!-- Plane dot at top of orbit arc -->
-  <circle cx="22.5" cy="9.5" r="3" fill="white"/>
-  <!-- Subtle trail -->
-  <path d="M22.5 9.5 Q18 14 12 18" stroke="white" stroke-width="1" stroke-opacity="0.3"
-        fill="none" stroke-linecap="round"/>
+  <!-- Orbi mark: two crossing ellipses, matching src/components/OrbiLogo.tsx -->
+  <ellipse cx="16" cy="16" rx="11" ry="6.5"
+           stroke="white" stroke-width="1.4" fill="none" stroke-opacity="0.9"
+           transform="rotate(-30 16 16)"/>
+  <ellipse cx="16" cy="16" rx="11" ry="6.5"
+           stroke="white" stroke-width="1.4" fill="none" stroke-opacity="0.6"
+           transform="rotate(30 16 16)"/>
+  <!-- Dot -->
+  <circle cx="25.5" cy="10.5" r="2.3" fill="white"/>
 </svg>
