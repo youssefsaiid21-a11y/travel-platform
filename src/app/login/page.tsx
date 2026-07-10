@@ -127,6 +127,10 @@ export default function LoginPage() {
                   </button>
                 </div>
               </label>
+
+              <Link href="/forgot-password" className={styles.link} style={{ alignSelf: "flex-end", fontSize: "0.8rem" }}>
+                Forgot your password?
+              </Link>
             </>
           ) : (
             <label className={styles.label}>

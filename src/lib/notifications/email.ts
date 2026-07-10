@@ -65,6 +65,77 @@ function formatPrice(amount: string, currency: string): string {
   }
 }
 
+function buildRecoveryHtml(recoveryUrl: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f0f9ff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <div style="max-width:520px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
+    <div style="background:linear-gradient(135deg,#0284c7,#0ea5e9);padding:32px 36px">
+      <div style="font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.02em">Orbi</div>
+      <div style="font-size:14px;color:rgba(255,255,255,0.8);margin-top:4px">Account recovery</div>
+    </div>
+    <div style="padding:32px 36px">
+      <h1 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#0f172a">Reset your password</h1>
+      <p style="margin:0 0 28px;font-size:14px;color:#64748b">
+        We received a request to reset your Orbi password and two-factor
+        authentication. This link expires in 60 minutes and can only be used once.
+      </p>
+
+      <a href="${recoveryUrl}" style="display:block;text-align:center;background:#0284c7;color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:14px 24px;border-radius:8px">Reset password</a>
+
+      <p style="margin:24px 0 0;font-size:12px;color:#94a3b8;text-align:center">
+        Didn't request this? You can safely ignore this email - your account is unchanged.
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+// Resetting the password here also clears the account's MFA state (see
+// POST /api/auth/recovery/redeem) - this is the intended, credential-
+// compromise-adjacent behavior, not a bug: a lost authenticator + lost
+// backup codes is exactly the scenario this flow exists for.
+export async function sendAccountRecoveryEmail(data: { userEmail: string; recoveryUrl: string }): Promise<void> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) {
+    // Dev-only: the reset link is the actual secret this flow protects, so
+    // it's deliberately never logged outside local development (unlike the
+    // other fail-open warnings in this file, which never touch content) -
+    // this is the only way to manually test the recovery flow without a
+    // real Resend key configured.
+    if (process.env.NODE_ENV === "development") {
+      console.warn(`[notifications/email] RESEND_API_KEY not set - recovery link for ${data.userEmail}: ${data.recoveryUrl}`);
+    } else {
+      console.warn("[notifications/email] RESEND_API_KEY not set - skipping account recovery email");
+    }
+    return;
+  }
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Orbi Security <security@orbi.travel>",
+      to: [data.userEmail],
+      subject: "Reset your Orbi password",
+      html: buildRecoveryHtml(data.recoveryUrl),
+    }),
+  });
+
+  if (!res.ok) {
+    console.error(
+      "[notifications/email] Resend error (recovery):",
+      res.status,
+      (await res.text().catch(() => "")).slice(0, 300)
+    );
+  }
+}
+
 function buildHtml(data: BookingNotificationData): string {
   const ref = data.bookingRef ?? data.bookingId.slice(0, 8).toUpperCase();
   const price = formatPrice(data.totalAmount, data.totalCurrency);

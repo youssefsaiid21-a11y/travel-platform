@@ -14,6 +14,9 @@ export default defineConfig({
       // A real 32-byte AES-256 key, base64-encoded - not the production
       // key, just needs to be valid-shaped for src/lib/crypto.ts to work.
       PASSPORT_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      // Not the production secret - just needs to be set for
+      // src/lib/recoveryToken.ts's HMAC to work in tests.
+      NEXTAUTH_SECRET: "test-only-nextauth-secret-placeholder",
     },
   },
   resolve: {

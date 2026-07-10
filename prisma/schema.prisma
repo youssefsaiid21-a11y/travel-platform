@@ -36,9 +36,33 @@ model User {
   // once at enrollment time and never retrievable again. A code is removed
   // from this array the moment it's used (src/auth.ts's authorize()).
   backupCodes      Json?
+  // Minimal admin/operator flag (src/app/admin/*, src/app/api/admin/*).
+  // Not exposed via any API - flipped directly in the DB by the founder.
+  isAdmin          Boolean          @default(false)
   bookings         Booking[]
   passengerProfile PassengerProfile?
   trackedSearches  TrackedSearch[]
+  recoveryTokens   AccountRecoveryToken[]
+}
+
+// One-time password/MFA-recovery tokens (src/app/api/auth/recovery/*).
+// tokenHash is HMAC-SHA256(raw, NEXTAUTH_SECRET) - never stored in
+// plaintext. Deliberately not bcrypt: redemption needs an indexed
+// exact-match lookup by the presented token, which bcrypt's per-call
+// salting makes impossible without already knowing the user.
+// ON DELETE CASCADE is a deliberate, narrow deviation from Booking's
+// no-cascade convention - this is ephemeral security data with no
+// legal-retention need, unlike bookings.
+model AccountRecoveryToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model PassengerProfile {
