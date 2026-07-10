@@ -74,7 +74,9 @@ the sandbox check: reject any token that does not start with `duffel_test_`.
 ```
 OfferRequest  (your search parameters)
     └─► Offer[]  (airline responses - one per itinerary option)
-            └─► Order  (confirmed booking - PHASE 2 ONLY, do not build yet)
+            └─► Order  (confirmed booking - LIVE: see src/lib/duffel/orders.ts,
+                        POST /api/booking. Order creation and payment are
+                        both built and in production, not future scope.)
 ```
 
 ### OfferRequest
@@ -184,21 +186,22 @@ priority_check_in:        string
 advance_seat_selection:   string
 ```
 
-### Order (Phase 2 - DO NOT BUILD YET)
+### Order (LIVE - see src/lib/duffel/orders.ts)
 Created from an offer. Contains `booking_reference` (PNR), `payment_status`, and the
-confirmed itinerary. Created via `POST /air/orders`. Not in scope for slice 1.
+confirmed itinerary. Created via `POST /air/orders`, called from `POST /api/booking`
+after a real Stripe payment succeeds and is re-verified against the offer's own price.
 
 ---
 
-## Search Flow (Slice 1 scope)
+## Search Flow
 
 ```
 1. POST /air/offer_requests   → returns offer_request.id + offers[]
 2. (optional) GET /air/offers/{id}   → get a single offer by id
 3. (optional) GET /air/offer_requests/{id}  → re-fetch all offers for a search
+4. POST /air/orders            → creates the confirmed booking (LIVE, see
+                                   src/lib/duffel/orders.ts and POST /api/booking)
 ```
-
-Order creation is step 4 (Phase 2 only).
 
 ---
 
@@ -358,10 +361,17 @@ All errors follow this envelope:
 
 ---
 
-## Things NOT in scope for Slice 1
+## Current build status (corrected 2026-07-10 - this section was stale)
 
-- `POST /air/orders` - order/booking creation (Phase 2)
-- Payment endpoints
-- Seat selection, baggage services (ancillaries)
-- Webhooks
-- Order changes/cancellations
+- `POST /air/orders` (order/booking creation) - **LIVE**, see
+  src/lib/duffel/orders.ts and POST /api/booking.
+- Payment (Stripe PaymentIntent + webhook) - **LIVE**, see
+  src/app/api/stripe/payment-intent and src/app/api/stripe/webhook.
+- Seat/baggage ancillary data (`available_services` on Offer) - surfaced in
+  the booking UI ("View bag & seat options" / "View seat map"); not
+  independently re-verified whether the full purchase flow for these
+  ancillaries is wired end-to-end.
+- **Order changes/cancellations - still genuinely not built.** No
+  `POST /air/order_cancellations` call exists anywhere in the repo. This is
+  the real, current gap (see the account-recovery/admin-surface/refund
+  planning work for the up-to-date status).
