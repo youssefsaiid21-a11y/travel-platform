@@ -13,11 +13,15 @@ import { authorizeCredentials } from "@/lib/authorizeCredentials";
 export async function verifyTokenVersion(token: JWT): Promise<JWT | null> {
   const dbUser = await db.user.findUnique({
     where: { id: token.id as string },
-    select: { tokenVersion: true },
+    // isAdmin rides this same per-request read (not just at sign-in), so
+    // the JWT claim proxy.ts gates /admin on stays fresh on essentially
+    // every request rather than only until the next sign-in.
+    select: { tokenVersion: true, isAdmin: true },
   });
   if (!dbUser || dbUser.tokenVersion !== token.tokenVersion) {
     return null;
   }
+  token.isAdmin = dbUser.isAdmin;
   return token;
 }
 
@@ -46,12 +50,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
         token.tokenVersion = user.tokenVersion;
+        token.isAdmin = user.isAdmin;
         return token;
       }
       return verifyTokenVersion(token);
     },
     session({ session, token }) {
       session.user.id = token.id as string;
+      session.user.isAdmin = token.isAdmin;
       return session;
     },
   },

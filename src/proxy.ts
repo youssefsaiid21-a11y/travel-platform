@@ -50,6 +50,25 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Rides the same per-request tokenVersion DB read (verifyTokenVersion in
+  // src/auth.ts), so this isn't an extra query - the isAdmin claim is
+  // already as fresh as tokenVersion itself. Admin API routes/pages still
+  // re-check isAdmin against the DB directly (defense-in-depth against a
+  // demoted admin whose JWT hasn't rotated yet) - this gate is just the
+  // first line of defense, not the only one.
+  if (pathname.startsWith("/admin")) {
+    if (!isLoggedIn) {
+      const loginUrl = new URL("/login", req.url);
+      loginUrl.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    if (!req.auth?.user?.isAdmin) {
+      // Redirect non-admins to home rather than a distinguishable 404/403 -
+      // don't reveal that an /admin route exists to a logged-in non-admin.
+      return NextResponse.redirect(new URL("/", req.url));
+    }
+  }
+
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const csp = buildCsp(nonce);
 

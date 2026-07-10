@@ -83,5 +83,6 @@ export async function authorizeCredentials(
     email: user.email,
     name: user.name,
     tokenVersion: user.tokenVersion,
+    isAdmin: user.isAdmin,
   };
 }

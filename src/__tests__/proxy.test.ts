@@ -21,9 +21,9 @@ import proxyHandler from "@/proxy";
 // synchronously - this local wrapper reflects what actually runs in tests.
 const proxy = proxyHandler as unknown as (req: NextRequest) => NextResponse;
 
-function makeReq(pathname: string) {
+function makeReq(pathname: string, auth: { user?: { isAdmin?: boolean } } | null = null) {
   const req = new NextRequest(`http://localhost${pathname}`);
-  Object.defineProperty(req, "auth", { value: null, writable: true });
+  Object.defineProperty(req, "auth", { value: auth, writable: true });
   return req;
 }
 
@@ -101,5 +101,33 @@ describe("proxy channel attribution", () => {
     const res = proxy(req);
     const setCookie = res.headers.get("set-cookie") ?? "";
     expect(setCookie).not.toContain("orbi_channel");
+  });
+});
+
+describe("proxy admin gating", () => {
+  it("redirects a logged-out visitor to /login with a callbackUrl", () => {
+    const res = proxy(makeReq("/admin"));
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("location")!);
+    expect(location.pathname).toBe("/login");
+    expect(location.searchParams.get("callbackUrl")).toBe("/admin");
+  });
+
+  it("redirects a logged-in non-admin to home, not to /login", () => {
+    const res = proxy(makeReq("/admin", { user: { isAdmin: false } }));
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("location")!);
+    expect(location.pathname).toBe("/");
+  });
+
+  it("lets a logged-in admin through to /admin", () => {
+    const res = proxy(makeReq("/admin", { user: { isAdmin: true } }));
+    expect(res.status).not.toBe(307);
+    expect(res.headers.get("Content-Security-Policy")).toBeTruthy();
+  });
+
+  it("does not gate non-admin routes on the isAdmin check", () => {
+    const res = proxy(makeReq("/", { user: { isAdmin: false } }));
+    expect(res.status).not.toBe(307);
   });
 });
