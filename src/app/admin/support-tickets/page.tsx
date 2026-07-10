@@ -40,6 +40,7 @@ export default async function AdminSupportTicketsPage({
           <nav className={styles.nav}>
             <Link href="/admin" className={styles.navLink}>Dashboard</Link>
             <Link href="/admin/bookings" className={styles.navLink}>Bookings</Link>
+            <Link href="/admin/ops" className={styles.navLink}>Operations</Link>
           </nav>
         </div>
 

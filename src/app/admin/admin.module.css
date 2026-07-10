@@ -168,6 +168,70 @@
   color: var(--danger);
 }
 
+/* Ops dashboard status buckets - computed from BUSINESS_STATE.md's
+   free-form status prose (see statusBucket() in ops/page.tsx), not matched
+   directly against its text, since that text varies ("merged to main,
+   live", "agent defined, feature LIVE", etc.) rather than being a fixed
+   vocabulary. */
+.status[data-status="live"] {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.status[data-status="drafted"] {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.status[data-status="not-activated"],
+.status[data-status="not-wired"],
+.status[data-status="unknown"] {
+  background: rgba(91, 141, 176, 0.08);
+  color: var(--text-3);
+  border: 1px dashed var(--text-3);
+}
+
+.rawSection {
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+  color: var(--text-2);
+  line-height: 1.6;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--r-lg);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.statStrip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.stat {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 0.85rem 1rem;
+}
+
+.statValue {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-1);
+  letter-spacing: -0.02em;
+}
+
+.statLabel {
+  font-size: 0.72rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 0.15rem;
+}
+
 .itemMeta {
   font-size: 0.8rem;
   color: var(--text-3);
