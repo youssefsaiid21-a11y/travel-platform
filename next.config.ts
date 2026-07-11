@@ -13,6 +13,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // scripts/run-admin-local.mjs's dedicated local admin instance gets its
+  // own build directory so it can run alongside a regular `npm run dev` -
+  // both otherwise share `.next/`'s lock file and Next refuses to start a
+  // second dev server against the same one.
+  ...(process.env.ADMIN_LOCAL_MODE === "1" ? { distDir: ".next-admin" } : {}),
   async headers() {
     return [
       {
@@ -27,15 +32,6 @@ const nextConfig: NextConfig = {
     // animation library needed. Ships in Next's own bundled React build;
     // @types/react doesn't know about it yet, hence src/types/react-view-transition.d.ts.
     viewTransition: true,
-  },
-  // /admin/ops reads .claude/BUSINESS_STATE.md via fs at request time
-  // (src/lib/businessState.ts). That file lives outside src/ and is read,
-  // not imported, so @vercel/nft's static analysis isn't guaranteed to
-  // include it in the deployed function's bundle - pin it explicitly
-  // rather than relying on next dev's raw filesystem access (which works
-  // regardless and would hide this in local testing).
-  outputFileTracingIncludes: {
-    "/admin/ops": [".claude/BUSINESS_STATE.md"],
   },
 };
 

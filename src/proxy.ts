@@ -35,9 +35,34 @@ function buildCsp(nonce: string) {
   ].join("; ");
 }
 
+// Set only by scripts/run-admin-local.mjs, which launches a `next dev`
+// instance dedicated to browsing /admin locally against a real (typically
+// production) DATABASE_URL. The admin dashboard is deliberately NOT part of
+// the deployed site at all (see the VERCEL check below) - it's a local-only
+// tool, so it doesn't need its own login flow; this instance never leaves
+// your machine.
+const isAdminLocalMode = process.env.ADMIN_LOCAL_MODE === "1";
+
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const { pathname } = req.nextUrl;
+
+  // The admin dashboard must never be reachable on the deployed site
+  // (production or preview) - VERCEL is set to "1" in every Vercel-built
+  // environment. 404, not a redirect, so its existence isn't revealed.
+  if (pathname.startsWith("/admin") && process.env.VERCEL === "1") {
+    return new NextResponse("Not Found", { status: 404 });
+  }
+
+  if (isAdminLocalMode) {
+    // This instance exists only to serve /admin - block everything else so
+    // a stray click can't read/write production data through the rest of
+    // the app (checkout, profile edits, etc.) via this local server.
+    if (!pathname.startsWith("/admin")) {
+      return new NextResponse("Not Found", { status: 404 });
+    }
+    return NextResponse.next();
+  }
 
   const isProtected =
     pathname.startsWith("/bookings") ||

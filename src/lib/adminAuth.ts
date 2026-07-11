@@ -14,6 +14,11 @@ export type AdminAuthResult =
 // Distinguishes "not logged in" from "logged in but not admin" so callers
 // can return 401 vs 403 rather than collapsing both into one status.
 export async function requireAdmin(): Promise<AdminAuthResult> {
+  // scripts/run-admin-local.mjs's dedicated local-only instance - see
+  // src/proxy.ts's isAdminLocalMode gate, which already restricts this
+  // instance to /admin routes only and never runs on the deployed site.
+  if (process.env.ADMIN_LOCAL_MODE === "1") return { ok: true, id: "local-admin" };
+
   const session = await auth();
   if (!session?.user?.id) return { ok: false, reason: "unauthenticated" };
   if (!session.user.isAdmin) return { ok: false, reason: "forbidden" };
