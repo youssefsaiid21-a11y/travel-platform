@@ -33,8 +33,9 @@ Content & Virality rather than drafting copy yourself.
    appropriate for a real (if early) product: Product Hunt launch
    readiness, relevant subreddits/communities where flight-search tools are
    genuinely useful to discuss, X/Twitter. Paid channels are explicitly out
-   of scope - that's the Paid Ads agent's job, gated on a founder budget
-   decision.
+   of scope - no agent currently owns paid acquisition (the Paid Ads agent
+   was deleted 2026-07-11, drafted-only and never activated); flag it as a
+   gap for the founder rather than drafting paid-channel plans yourself.
 4. Any single-channel-dependency risk - e.g. if all traffic plans lean on
    one channel with nothing else prepared as a fallback.
 

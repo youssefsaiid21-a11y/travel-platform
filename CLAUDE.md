@@ -279,9 +279,11 @@ of trying to hold everything in one long-running session.
 ### Agent roster
 See `.claude/BUSINESS_STATE.md` for current build/activation status.
 Phased build order: Operations -> SEO + GEO -> Content & Virality ->
-Channel Coverage -> Finance (read-only) -> Customer Support (draft-only)
--> Paid Ads (hard spend caps, activated last). Each agent gets built, run
-once for real, and reviewed before the next one starts - same discipline
+Channel Coverage -> Finance (read-only) -> Customer Support (draft-only).
+(Paid Ads agent was deleted 2026-07-11, founder call - not worth carrying
+drafted for an inactive channel; re-add if paid acquisition becomes a
+priority.) Each agent gets built, run once for real, and reviewed before
+the next one starts - same discipline
 already used for the Phase 0-5 architecture roadmap above.
 
 ### Parallel agent protocol (learned the hard way - 2026-07-09)

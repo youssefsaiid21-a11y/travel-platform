@@ -87,7 +87,7 @@ exists and will populate from here on.
 | Channel Coverage | merged to `main`, live | `.claude/agents/channel-coverage-agent.md` - PR #4 merged |
 | Finance | drafted, NOT activated | `.claude/agents/finance-agent.md` - read-only by design; prompt reviewed 2026-07-09, still needs an explicit go-ahead for first real run |
 | Customer Support | agent defined, feature LIVE | `.claude/agents/customer-support-agent.md` written (draft-only, never auto-sends); `/support` page + API route live in production, SupportTicket migration applied and verified end-to-end |
-| Paid Ads | drafted, NOT activated | `.claude/agents/paid-ads-agent.md` - no live write access designed in; still needs a founder budget decision + prompt sign-off before first real run |
+| Paid Ads | deleted 2026-07-11 | founder call - not worth carrying a drafted agent for a channel that's not active; re-add if/when paid acquisition becomes a real priority |
 
 ## Harness calibration log
 Every time the auto-mode classifier blocks something, record it here once
@@ -102,6 +102,13 @@ to confirm again.
 | 2026-07-09 | `vercel env pull --environment=production` (early session, Stripe outage investigation) | Declined - found the needed non-secret value via code-level fallback instead | **Always-confirm** (dumps ALL prod secrets to a local file for a narrow need - never worth pre-authorizing). |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-11: Deleted the Paid Ads agent (`.claude/agents/paid-ads-agent.md`)
+  per explicit founder direction ("useless for now") - it had never been
+  activated (no live ad-platform write access, no budget decision made).
+  Updated the roster table, the open-escalations entry, and CLAUDE.md's
+  phased build order to drop it. Not a loss of any real capability - it was
+  drafted-only from the day it was written; re-add it if/when paid
+  acquisition becomes an actual priority.
 - 2026-07-09: Launch-readiness pass, orchestrated directly (no sub-agent
   plan-mode stalls) after the founder asked three concrete questions: how
   we capture initial users, how we test in a real environment, and whether
@@ -267,13 +274,12 @@ to confirm again.
   concurrency figure, or run against a preview deployment with a Vercel
   automation-bypass secret) is worth doing to get real numbers instead of
   code-audit inference - founder call on whether/how to run it.
-- **Finance and Paid Ads agents are drafted but not activated** - both
-  prompts are written with hard escalation gates built in, but per
-  `.claude/settings.json`, a general "keep going" instruction does not cover
-  their first real invocation. Needs the founder to review each prompt
-  (`.claude/agents/finance-agent.md`, `.claude/agents/paid-ads-agent.md`)
-  before either is ever actually run. Paid Ads additionally needs an
-  explicit budget decision first.
+- **Finance agent is drafted but not activated** - the prompt is written
+  with hard escalation gates built in, but per `.claude/settings.json`, a
+  general "keep going" instruction does not cover its first real
+  invocation. Needs the founder to review the prompt
+  (`.claude/agents/finance-agent.md`) before it's ever actually run.
+  (Paid Ads agent was deleted 2026-07-11 - no longer applicable.)
 - `flightGuides.ts`'s FAQ content (now live via the merged SEO PR) makes
   visa/entry-requirement claims (e.g. UK->US ESTA) - already hedged
   ("requirements change, always check current rules") but still worth a

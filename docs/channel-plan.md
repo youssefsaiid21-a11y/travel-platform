@@ -4,8 +4,10 @@ Owned by the Channel Coverage agent (`.claude/agents/channel-coverage-agent.md`)
 Last revised: 2026-07-09. Update the date whenever this changes - don't let
 it go stale silently.
 
-No ad budget exists yet - paid channels are explicitly out of scope here
-(that's the Paid Ads agent's job, gated on a founder budget decision).
+No ad budget exists yet - paid channels are explicitly out of scope here.
+No agent currently owns this (the Paid Ads agent was deleted 2026-07-11,
+drafted-only and never activated); revisit if paid acquisition becomes a
+priority.
 Vercel Analytics (`search_completed`, `offer_selected`, `booking_completed`,
 now with `channel` attribution via a first-touch `orbi_channel` cookie) was
 just added this session - there is no real traffic data yet, so channel
@@ -21,7 +23,7 @@ prioritization below is based on cost/effort/fit, not measured performance.
 | Product Hunt | Dated, copy drafted | **Target launch day: Friday 2026-08-07** (~30-day prep window from today, Fri/Sat/Sun gives better #1-badge odds for a pre-audience solo founder). `og:image` already shipped. First-comment copy drafted below - founder to review, tweak in your own voice, and post (their account, their identity - not delegable). | Founder |
 | Reddit (r/flights, r/travel, r/digitalnomad, r/solotravel) | Dated, copy drafted | Draft posts below for r/travel and r/digitalnomad - post as a genuine community answer/share, not a promotional blast, or it gets removed and burns the account's standing. Target: 1-2 weeks before Product Hunt day (~2026-07-24 onward), spaced out, not all at once. | Founder |
 | X/Twitter | Not started | No account presence yet - lowest priority until organic/GEO channels show traction, since it needs ongoing manual engagement to work | Founder |
-| Paid ads (Google/Meta) | Explicitly out of scope | Needs a founder budget decision first | Paid Ads agent (not yet activated) |
+| Paid ads (Google/Meta) | Explicitly out of scope | Needs a founder budget decision first | No agent (deleted 2026-07-11) |
 
 ## Single-channel-dependency risk
 Everything currently *live* is organic-search/AI-answer-engine adjacent
