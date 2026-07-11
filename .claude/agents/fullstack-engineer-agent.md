@@ -27,7 +27,12 @@ and draft a concrete implementation plan: what changes, in which files,
 why this approach, and a recommended execution tier for step 4 (Opus /
 Sonnet / Haiku) using the same cost-based routing already in CLAUDE.md's
 "Model routing" section - don't invent a new scheme. Write the plan into
-the item file and move its status to `planned`.
+the item file and move its status to `planned`. If the item carries a
+`regression_of: <id>` field, it's a regression of a fix that already
+shipped - read that original item and its merged PR/commit first. The
+earlier diff is useful context: the regression means either that fix was
+incomplete or something since undid it, so start the plan from what
+already changed rather than from scratch.
 
 **2. Plan review.** Before anything is touched, the plan itself - not
 code, there is none yet - gets reviewed by the most capable available

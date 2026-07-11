@@ -42,6 +42,7 @@ exists and will populate from here on.
 | Paid Ads | deleted 2026-07-11 | founder call - not worth carrying a drafted agent for a channel that's not active; re-add if/when paid acquisition becomes a real priority |
 | Product | drafted, NOT run | `.claude/agents/product-agent.md` - diagnostic-only, walks real flows via live browser, files findings to `docs/product-quality/`; never touches code. Needs a first real run + review before it's routine. |
 | Fullstack Engineer | drafted, NOT run | `.claude/agents/fullstack-engineer-agent.md` - executes the Product Agent's queue; every item needs founder plan-approval before code is written, no exception yet. Needs a first real run + review before it's routine. |
+| UI | drafted, NOT run | `.claude/agents/ui-agent.md` - owns visual/UX craft layer product-wide, paired with `.claude/design-system.md`. Ships small reversible changes via PR (never merges its own PR - founder reviews at merge time, same as SEO/GEO/Content/Channel); money-adjacent screens and its first task (porting the 2026-07 hero redesign into real code) are founder-gated regardless. Sourced from a parallel `ui-rehaul` worktree session, integrated 2026-07-11 after a Fable review found real gaps (missing browser tools in its own tool grant, no environment-safety constraint, a stale harness push-rule undermining "never auto-merge") - all fixed before this row was added. Needs a first real run + review before it's routine, same as Product/Fullstack Engineer. |
 
 ## Harness calibration log
 Every time the auto-mode classifier blocks something, record it here once
@@ -54,8 +55,45 @@ to confirm again.
 | 2026-07-09 | `vercel env add DATABASE_URL <env> --force -y` (pooled endpoint swap) | Founder gave one specific yes via AskUserQuestion showing the exact command+value; applied across prod/preview/dev | **Always-confirm.** An existing `autoMode.allow` rule already named `DATABASE_URL` generically and still wasn't sufficient - the classifier explicitly reasoned that a live prod DB credential force-write needs the exact action named each time, not a category match. Don't spend effort re-drafting a broader rule for this - it's rare enough (a handful of times per project lifetime) that asking each time is the right cost. |
 | 2026-07-09 | Raw 100-connection concurrency script directly against the live production Neon DB | Declined - used a verified-connectivity check + Neon's own documented pooling rationale as evidence instead, deferred the real stress test until after the endpoint switch landed | **Always-confirm, and often just don't.** Risk here scales with parameters chosen per-invocation (target, connection count) - this is exactly the kind of block that's correct to hit every time, since "safe" depends on what's being tested, not on having asked before. |
 | 2026-07-09 | `vercel env pull --environment=production` (early session, Stripe outage investigation) | Declined - found the needed non-secret value via code-level fallback instead | **Always-confirm** (dumps ALL prod secrets to a local file for a narrow need - never worth pre-authorizing). |
+| 2026-07-11 | N/A - not a classifier block, a self-audit finding during UI Agent's design review: the standing `git push origin main` allow rule's premise ("no PR workflow exists") had gone stale now that PR-based agents exist, leaving a real gap between "never auto-merge" as written in agent prompts and what the harness actually permitted | Founder approved (via AskUserQuestion) a scoped narrowing: the rule now excludes merging/pushing any PR-based agent's branch, exact text in `.claude/settings.json` | **Self-modification, exact-text confirmed** - not a new bucket, same rule as always (settings changes need the founder's literal sign-off, general "keep going" doesn't cover it). Logged here as a reminder to periodically re-check standing rules against premises that may have gone stale as the agent roster grows, not just when something actively breaks. |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-11: Integrated a third agent, UI Agent, sourced from a parallel
+  `ui-rehaul` worktree session's independent draft (`design-system.md` +
+  a first-pass `ui-agent.md`, uncommitted in that worktree) that had no
+  knowledge of the Product Agent/Fullstack Engineer pair being designed
+  in parallel today. A `fable`-model review of the corrected integration
+  found this had gotten a lighter review pass than the first two agents
+  and caught real gaps: (1) the harness's standing `git push origin main`
+  autoMode rule (justified by "this repo has no PR workflow," now false)
+  meant this agent's whole "never auto-merge" safety story rested on a
+  boundary the harness didn't actually enforce - flagged to the founder
+  for exact-text sign-off on a scoped fix rather than changed unilaterally;
+  (2) `booking-safety-reviewer`'s checks are code-path based (Duffel/
+  payment/secrets) and structurally cannot catch a UI-only change that
+  visually weakens CLAUDE.md's hard guardrail #2 (itemized price shown
+  before money moves) - fixed by adding an explicit money-adjacent file
+  list to `ui-agent.md` that's always founder-gated, not judgment-based;
+  (3) the cap section cited a nonexistent Fullstack Engineer cap (it has
+  none - the citation should have been Product Agent's cap+severity-
+  exemption) and had no filing path for a critical bug found mid-pass -
+  both fixed; (4) no `BUSINESS_STATE.md` roster row existed, so the
+  "first run reviewed before routine" rule (every other new agent gets
+  this) had no enforcement mechanism - this row is that fix;
+  (5) `docs/product-quality/README.md`'s state machine flatly contradicted
+  `ui-agent.md` about whether founder approval is required for the same
+  items - added an explicit `owner` field + a UI-owned shorter path
+  through the same state machine, money-adjacent items excepted. Also
+  added: rebase-before-merge + hub-file collision awareness (the same
+  Parallel Agent Protocol discipline Fullstack Engineer already has,
+  missing from the first draft despite this agent's natural footprint
+  being `globals.css` and shared `.module.css` files - exactly the kind
+  of file the real 2026-07-09 incident involved). One separate, non-
+  blocking note the review surfaced: the design system's brand tokens
+  (sky-blue accent, Inter, frosted glass over a gradient) are polished
+  but land on what's currently the most common AI-SaaS visual language -
+  a founder-level brand call, not an agent-file defect, flagged for
+  awareness not action.
 - 2026-07-11: Designed and drafted two new agents after a founder design
   session (not built unilaterally - went through several rounds of
   founder correction first): Product Agent (diagnostic-only, walks real
