@@ -1,0 +1,38 @@
+name: Product e2e regression
+
+# The automated backbone behind the Product Agent / Fullstack Engineer loop
+# (CLAUDE.md's Executive Charter) - catches outright functional breakage
+# cheaply and often; the Product Agent's own human-perspective walkthrough
+# stays on-demand for deeper UX judgment. Deliberately separate from
+# ci.yml/smoke-test.yml and not run per-PR - real browser automation
+# against a real deployment is slower and noisier than unit tests, same
+# reasoning as smoke-test.yml.
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  product-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npx playwright test
+        env:
+          PLAYWRIGHT_TEST_URL: ${{ vars.SMOKE_TEST_URL || 'https://travel-platform-ashy.vercel.app' }}
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

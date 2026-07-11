@@ -279,12 +279,28 @@ of trying to hold everything in one long-running session.
 ### Agent roster
 See `.claude/BUSINESS_STATE.md` for current build/activation status.
 Phased build order: Operations -> SEO + GEO -> Content & Virality ->
-Channel Coverage -> Finance (read-only) -> Customer Support (draft-only).
+Channel Coverage -> Finance (read-only) -> Customer Support (draft-only) ->
+Product (diagnostic-only) + Fullstack Engineer (executor).
 (Paid Ads agent was deleted 2026-07-11, founder call - not worth carrying
 drafted for an inactive channel; re-add if paid acquisition becomes a
 priority.) Each agent gets built, run once for real, and reviewed before
 the next one starts - same discipline
 already used for the Phase 0-5 architecture roadmap above.
+
+**Product + Fullstack Engineer are a diagnosis/execution pair, not two
+independent agents.** Product Agent walks the live product like a real
+user (real browser access) and files structured findings to
+`docs/product-quality/` (see that directory's README for the schema and
+state machine) - it never writes code. Fullstack Engineer agent executes
+that queue: plan -> Opus plan-review -> founder approval -> execute ->
+independent Opus re-review -> PR (never auto-merge). Founder approval is
+required before code is written for every item today, a deliberately
+stronger gate than the propose-only-PR pattern the other content-tier
+agents get, because this pair's combined surface is the whole product
+rather than one lane. See both agents' own `.claude/agents/*.md` files
+for the full detail, and BUSINESS_STATE.md's 2026-07-11 decision log entry
+for why (a `fable`-model design review argued directly against removing
+the founder from the loop entirely, which was the original ask).
 
 ### Parallel agent protocol (learned the hard way - 2026-07-09)
 Dispatching the SEO/GEO/Content/Channel agents fully in parallel from the

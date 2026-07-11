@@ -88,6 +88,8 @@ exists and will populate from here on.
 | Finance | drafted, NOT activated | `.claude/agents/finance-agent.md` - read-only by design; prompt reviewed 2026-07-09, still needs an explicit go-ahead for first real run |
 | Customer Support | agent defined, feature LIVE | `.claude/agents/customer-support-agent.md` written (draft-only, never auto-sends); `/support` page + API route live in production, SupportTicket migration applied and verified end-to-end |
 | Paid Ads | deleted 2026-07-11 | founder call - not worth carrying a drafted agent for a channel that's not active; re-add if/when paid acquisition becomes a real priority |
+| Product | drafted, NOT run | `.claude/agents/product-agent.md` - diagnostic-only, walks real flows via live browser, files findings to `docs/product-quality/`; never touches code. Needs a first real run + review before it's routine. |
+| Fullstack Engineer | drafted, NOT run | `.claude/agents/fullstack-engineer-agent.md` - executes the Product Agent's queue; every item needs founder plan-approval before code is written, no exception yet. Needs a first real run + review before it's routine. |
 
 ## Harness calibration log
 Every time the auto-mode classifier blocks something, record it here once
@@ -102,6 +104,32 @@ to confirm again.
 | 2026-07-09 | `vercel env pull --environment=production` (early session, Stripe outage investigation) | Declined - found the needed non-secret value via code-level fallback instead | **Always-confirm** (dumps ALL prod secrets to a local file for a narrow need - never worth pre-authorizing). |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-11: Designed and drafted two new agents after a founder design
+  session (not built unilaterally - went through several rounds of
+  founder correction first): Product Agent (diagnostic-only, walks real
+  flows via live browser like a human user, asking "is this easy/simple,"
+  finds bugs and friction, never touches code) and Fullstack Engineer
+  agent (executes the Product Agent's queue - plan, Opus plan-review,
+  founder approval, execute, independent Opus re-review, then PR - never
+  auto-merges). Before finalizing, ran a design review via the `fable`
+  model specifically probing "what would it take to remove the founder
+  from the loop entirely" (the founder's own request) - the review argued
+  directly against full removal (approving a plan costs minutes; a
+  silently broken checkout costs real revenue and trust, and this
+  project's own Parallel Agent Protocol incident already proves silent
+  regressions get past narrower, more isolated per-branch review than
+  this agent will have) and recommended earning autonomy with evidence
+  instead of declaring it - incorporated as: `bug`-type items are the
+  category eligible to eventually skip the approval gate via the existing
+  Harness learning loop mechanism below; `improvement`-type items (product
+  redesign judgment calls) stay founder-gated permanently, matching the
+  Charter's existing escalation rule. Also incorporated: the report queue
+  is one-file-per-item in `docs/product-quality/`, not a single shared
+  log (avoids repeating the sitemap.ts/layout.tsx collision), and the
+  Product Agent's browser walkthrough is hard-constrained to
+  local/preview test-mode credentials, never production - the design as
+  first described didn't specify this and would have meant placing real
+  orders against live payment credentials while "just testing."
 - 2026-07-11: Deleted the Paid Ads agent (`.claude/agents/paid-ads-agent.md`)
   per explicit founder direction ("useless for now") - it had never been
   activated (no live ad-platform write access, no budget decision made).

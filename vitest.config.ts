@@ -5,6 +5,10 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    // e2e/ holds real Playwright specs (run via `npm run test:e2e`, a
+    // separate browser-automation tool with its own test/expect globals) -
+    // Vitest's default *.spec.ts glob would otherwise try to run them too.
+    exclude: ["**/node_modules/**", "**/e2e/**"],
     // Tests that hit routes touching getStripe() mock the `stripe` package
     // itself, but getStripe() still checks STRIPE_SECRET_KEY is non-empty
     // before constructing the (mocked) client - stub a placeholder so that
