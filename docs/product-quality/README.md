@@ -11,6 +11,11 @@ two items in flight never touch the same file.
 Filename: `BUG-0001-short-slug.md` or `IMP-0001-short-slug.md`. IDs are
 sequential per type, never reused even if an item is closed as wontfix/stale.
 
+Also in this directory: `last-checked.md` - a small state table (one row
+per flow, rewritten in full each run, never appended to), tracking when
+the Product Agent last walked each flow. Not part of the item schema below
+- see that file's own note for why it's deliberately not a growing log.
+
 ## Frontmatter schema
 
 ```yaml
@@ -28,14 +33,18 @@ observed_at_commit: <git sha the Product Agent was looking at when it found this
 ## Body
 
 **For a `bug`**: repro steps, expected behavior, actual behavior, and
-what you clicked/saw (a screenshot path or claude-in-chrome trace if one
-was captured). "I hesitated here" is not a repro - if you can't write
-concrete steps to reproduce it, it's an `improvement`, not a `bug`.
+real evidence - the actual JS console error or failed network request if
+there was one (the Product Agent has tools to capture both; a bug filed
+without evidence when evidence was available is a lower-quality report).
+"I hesitated here" is not a repro - if you can't write concrete steps to
+reproduce it, it's an `improvement`, not a `bug`.
 
 **For an `improvement`**: what's confusing or effortful about the current
-flow, why it hurts Ease specifically (not just "would be nicer"), and
-proposed acceptance criteria - what would have to be true for this to
-count as resolved.
+flow, why it hurts Ease specifically (not just "would be nicer"), proposed
+acceptance criteria - what would have to be true for this to count as
+resolved - and, if available, corroborating signal (a recurring support
+ticket theme, a real booking drop-off at this step). Not required, but an
+improvement backed by real signal is a stronger case than judgment alone.
 
 ## State machine
 
