@@ -276,6 +276,31 @@ Functional agents spawned via the Agent tool are naturally
 context-isolated (own context, return a summary) - lean on that instead
 of trying to hold everything in one long-running session.
 
+**Keeping BUSINESS_STATE.md from becoming a token sink.** It's read in
+full by every agent, every session - an unpruned file costs a little more
+on every single read, forever. The fix depends on what kind of section it
+is:
+- **State** (Agent roster status, and any future per-item status table)
+  is bounded by construction - one row per agent/item, updated in place,
+  never appended to. It can't grow unboundedly, so it needs no policy.
+- **Log** (Recent autonomous decisions, Harness calibration log) grows by
+  nature - every real decision adds an entry, forever, unless pruned.
+  Rule: once a log section passes roughly 40 entries or ~150 lines,
+  move the oldest half to a dated file under `.claude/archive/`
+  (`business-state-<date-or-range>.md`), and replace them in the live
+  file with a compressed summary (a few sentences, not a bare "see
+  archive" pointer with zero content) plus a link to the archive file.
+  Archives are never read by default - pull one up only when a session
+  genuinely needs that period's detail, the same way you wouldn't re-read
+  a whole past conversation for context that's already been summarized.
+- **Open escalations** is a current-state list, not a log - remove an
+  item once it's resolved rather than leaving it struck through. If the
+  resolution itself is worth remembering, that's what "Recent autonomous
+  decisions" is for; don't let a solved problem keep costing tokens on
+  every future read just because leaving it felt like a paper trail.
+- First real pass done 2026-07-11 (314 lines -> 131 lines) - see
+  `.claude/archive/business-state-2026-07-09.md`.
+
 ### Agent roster
 See `.claude/BUSINESS_STATE.md` for current build/activation status.
 Phased build order: Operations -> SEO + GEO -> Content & Virality ->

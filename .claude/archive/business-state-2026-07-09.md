@@ -1,0 +1,228 @@
+# BUSINESS_STATE.md archive - entries dated 2026-07-09
+
+Moved out of the live `BUSINESS_STATE.md` on 2026-07-11 per the archival
+rule in `CLAUDE.md`'s "Staying stateful across compaction and fresh
+sessions" section - `Recent autonomous decisions` had grown to ~178 of the
+live file's 314 lines, almost entirely single-day history with no ongoing
+decision-relevance. Not read by default; pull this up only when a session
+specifically needs 2026-07-09's detail. The live file keeps a compressed
+summary and a pointer here.
+
+## Go-live checklist progress (2026-07-09)
+Founder triaged the full go-live checklist (see local `docs/go-live-checklist.md`,
+gitignored - sensitive) and the following shipped to production this pass,
+each with real browser verification and/or a booking-safety-reviewer pass
+where it touched money code:
+- **Item 1**: flat $5 service fee (`src/lib/pricing.ts`) - the business's
+  first real revenue mechanism, was a pure zero-margin passthrough before.
+- **Item 4**: passport-number field-level encryption (`src/lib/crypto.ts`,
+  AES-256-GCM) + account deletion (anonymize, keep Booking history for
+  accounting) + GDPR-style data export.
+- **Item 5**: cookie consent banner, gates the `orbi_channel` attribution
+  cookie.
+- **Item 10**: support tickets now alert the founder by email (was silent).
+- **Item 12**: Stripe live-key code gate, mirrors the existing Duffel one.
+- **Item 13**: npm audit fixed via a `postcss` override (not a `next`
+  downgrade - `npm audit fix --force` suggested `next@9.3.3`, nonsensical).
+- **Item 14**: daily site-health cron + email alert - explicitly documented
+  as a daily digest, not real-time uptime monitoring (Vercel Hobby cron
+  frequency limit).
+- **Item 16**: financial reconciliation (`scripts/reconcile-finances.mjs`,
+  `src/lib/reconciliation.ts`) - real margin vs. Duffel cost, by currency.
+- **Item 17**: TOTP 2FA + single-use backup codes, verified end-to-end
+  including a real login with a backup code and confirming its removal.
+- **Item 18**: documented in `docs/disaster-recovery.md` (gitignored) -
+  Neon's actual plan/PITR retention isn't independently verified (no
+  console access), flagged for the founder to check directly.
+
+**Deferred per founder's explicit call** (not started): items 2 (refunds),
+3 (legal pages), 6 (licensing), 11 (Duffel/Stripe account-level steps),
+15 (custom domain).
+
+**Still genuinely open as of 2026-07-09:**
+- Items 8/9 (Resend + Sentry) - founder is creating both accounts and will
+  paste the API key/DSN; code paths (`sendAlertEmail`, notification infra)
+  are already built and waiting on `RESEND_API_KEY`/`ALERT_EMAIL`/`SENTRY_DSN`.
+- Item 7 (Vercel Pro) - founder said not yet; Hobby plan's commercial-use
+  ToS restriction remains unresolved until a real launch date approaches.
+
+## Follow-up deeper audit (2026-07-09, same day) - fixed 2 real vulnerabilities
+Founder asked "what else is missing" as a second pass. Investigated this
+session's own fast-moving changes for regressions plus areas the first
+audit didn't cover (admin tooling, accessibility/mobile). Found and fixed:
+- Account deletion wasn't clearing MFA fields (totpSecret/backupCodes) -
+  written before MFA existed, never updated.
+- **Real vulnerability**: `/api/auth/mfa/setup` could silently disable an
+  already-enabled MFA with no password check (a stolen session cookie
+  alone could turn off 2FA). Now requires the current password to
+  re-enroll when MFA is already on.
+- **Real vulnerability**: TOTP had no replay protection - the same valid
+  code could be reused within its ~90s window. Added
+  `User.totpLastUsedStep`, checked/updated on every login.
+All three fixed, tested (including a real browser login proving the DB
+write path works end-to-end, not just in test mocks), and deployed.
+
+New gaps surfaced as of 2026-07-09 (see `docs/go-live-checklist.md` items
+19-24 for full detail; note **the "zero admin/operator surface" gap below
+is now partially addressed** - `/admin`, `/admin/bookings`,
+`/admin/support-tickets`, and `/admin/ops` were built 2026-07-10/11):
+no account-recovery path if both authenticator + all backup codes are
+lost (genuine permanent lockout, support-ticket + manual DB fix only);
+real accessibility/mobile gaps (booking/confirm has zero `@media` queries,
+cookie banner isn't a real accessible dialog, disabled buttons and the MFA
+login step have no `aria-live` feedback) - these were NOT re-verified as
+part of the later admin-surface work and may still be open.
+
+## Recent autonomous decisions, 2026-07-09 (archived 2026-07-11)
+
+- 2026-07-09: Launch-readiness pass, orchestrated directly (no sub-agent
+  plan-mode stalls) after the founder asked three concrete questions: how
+  we capture initial users, how we test in a real environment, and whether
+  the product survives ~100 concurrent users. Ran 3 parallel read-only
+  Explore agents first to get evidence instead of guessing, then executed:
+  (1) Root-caused and fixed the reported logo bug - `align-items: baseline`
+  on a flex container silently disables `vertical-align` on the SVG mark
+  (spec behavior, not a rendering bug), switched to `align-items: center`.
+  Also fixed a minor hardcoded-value/token inconsistency on the flight-guide
+  CTA button. Both verified visually via claude-in-chrome, now live in prod.
+  (2) Added 10s timeouts to the Duffel and Z.AI clients and `maxDuration=30`
+  to `/api/chat` and `/api/booking` so a slow vendor response can't hang a
+  function instance indefinitely - live in prod. Constructed and verified
+  (via a real connection test) Neon's pooled endpoint for `DATABASE_URL`,
+  the single highest-ranked scalability risk found (direct endpoint has no
+  connection pooling, and Vercel's serverless fan-out can exhaust it) - the
+  actual prod/preview/dev env var swap and a small stress test to prove the
+  fix are both blocked pending founder sign-off (see Open escalations).
+  Judgment call: declined to also "tighten" the in-memory rate-limit
+  fallback values as originally planned - on inspection they're already
+  conservative (8-16 req/min per IP/user); the real gap is architectural
+  (per-instance counting under serverless fan-out, not loose numbers), so
+  changing them would only add friction without fixing anything.
+  (3) Built a pre-launch waitlist/email capture (`WaitlistSignup` model,
+  `/api/waitlist`, `WaitlistForm` component embedded on every flight-guide
+  and content-guide page) - the single biggest gap the research surfaced:
+  there was no way for SEO/GEO/content readers who aren't ready to book yet
+  to leave contact info, only a full account signup. Code-complete, tested,
+  browser-verified to fail gracefully pre-migration; migration itself is
+  gated on founder approval, same as `SupportTicket` was.
+  (4) Turned `docs/channel-plan.md` from an abstract "not started" list
+  into a dated plan: a concrete Product Hunt launch-day target (Friday
+  2026-08-07, ~30-day prep window) plus drafted first-comment and Reddit
+  copy, so posting is a five-minute review-and-post task for the founder
+  rather than a from-scratch writing task. Posting itself stays with the
+  founder (their account/identity, not delegable).
+  Two actions were correctly blocked by the harness's auto-mode classifier
+  rather than pushed through: force-writing the pooled `DATABASE_URL` across
+  Vercel environments, and running a 100-connection concurrency test
+  directly against the live production database (the second one especially
+  right - it could have caused the exact outage it was trying to diagnose).
+  Both are queued as explicit founder decisions instead of being bypassed.
+- 2026-07-09: Reconciled the 4 marketing-agent branches properly after
+  founder feedback that parallel-agent quality was subpar. Root cause
+  confirmed with hard evidence: SEO and Content & Virality had both
+  independently rewritten `sitemap.ts` (one would have silently reverted
+  the other's live-domain fix and dropped its URLs); GEO and Channel
+  Coverage had both independently rewritten `layout.tsx` (one would have
+  reverted the other's JSON-LD/corrected airline-count stat). Documented
+  the fix as a permanent "Parallel Agent Protocol" in `CLAUDE.md`
+  (foundation-before-fan-out, data-file extension over hub-file editing,
+  rebase-before-merge, integration-level testing, worktree cleanup
+  discipline). Then executed the merge properly: SEO -> GEO -> Content &
+  Virality -> Channel Coverage, each rebased onto the previous merge (not
+  the stale fork point) before merging, with the `sitemap.ts` conflict
+  resolved by hand (kept both flight-guide and content-guide entries plus
+  the domain fix) and the full test suite re-run after every merge. Found
+  and fixed 2 real display bugs during the post-merge browser verification
+  pass that no automated test caught: a duplicated airport code
+  ("Heathrow (LHR) (LHR)") and an ambiguous-looking missing space in a CTA
+  button. All 4 PRs merged and closed; their branches deleted (local +
+  remote) once merged.
+  Then, with explicit founder approval, applied the `SupportTicket`
+  migration to the production Neon DB and verified the full flow live
+  (filled and submitted the real `/support` form against production,
+  got the real success state - not just a code-level check) before
+  promoting the final build to production.
+  Judgment call surfaced and correctly deferred by a subagent mid-session:
+  "1,2,3 approved" was ambiguous between "merge PRs #1-4" (item 1, bundled)
+  and literally "PRs #1/#2/#3 only" - asked rather than guessed, since a
+  wrong guess either way meant either an unauthorized merge or leaving a
+  clean, tested PR needlessly stuck.
+- 2026-07-09: Full business-ops build-out session, capped with a production
+  deploy of everything merged to `main`. Summary of what shipped:
+  (1) Vercel Analytics + funnel tracking; (2) Customer Support intake code
+  (migration pending approval); (3) all 8 agent definitions written
+  (Operations active; SEO/GEO/Content/Channel ran real first passes, output
+  on PRs #1-4 for review since they're propose-only per the Charter;
+  Finance/Customer-Support/Paid-Ads drafted, gated on founder review/budget
+  before first real activation); (4) root-caused and fixed why every
+  spawned functional agent kept entering its own plan mode (CLAUDE.md's
+  Working Style told every session to plan for "anything beyond a trivial
+  fix" - didn't distinguish "you're deciding scope" from "you're executing
+  an already-specified task"); (5) sharpened MECE boundaries across the 4
+  content/marketing agents after a real overlap (SEO nearly duplicated
+  GEO's JSON-LD work); (6) broadened `.claude/settings.json` permissions
+  twice more after repeated founder feedback that prompts were still too
+  frequent - each widening needed the founder's exact-text sign-off per the
+  harness's self-modification rule, which cannot be pre-authorized by a
+  general instruction no matter how it's phrased.
+  Operational lesson: background agents running in isolated worktrees can
+  leave `.claude/worktrees/*` directories behind that get picked up by
+  `npm test`'s file globbing and produce spurious failures from stale/
+  parallel-universe code - run `git worktree list` and prune before trusting
+  a "tests are failing" signal if agent worktrees were used this session.
+  One stray agent also resurfaced mid-session after its worktree had
+  already been cleaned up once (harness apparently persists/resumes agent
+  state independent of the worktree directory) - had to be explicitly told
+  to stop and discard its redundant work.
+  Flagged for founder review before merging PR #2 (SEO): `flightGuides.ts`'s
+  FAQ content makes visa/entry-requirement claims (e.g. UK->US ESTA) -
+  already hedged ("requirements change, always check current rules") but
+  still a customer-facing legal/policy-adjacent claim worth a second look
+  per the Charter's escalation category, not something to wave through
+  unreviewed just because it's hedged.
+- 2026-07-09: Deployed to production (review gate passed: tests/lint/typecheck
+  clean, no Duffel/payment/UI diff since last deploy) and verified live via
+  claude-in-chrome: real search -> real Duffel sandbox offers -> booking form ->
+  Stripe card element mounted and validated a test card (Visa) in real time with
+  zero console errors, proving `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is now live in
+  the production bundle - the original booking/payment outage is confirmed fixed.
+  Did not complete the test charge (Stripe's expiry/CVC sub-fields sit inside one
+  opaque cross-origin iframe that synthetic browser-automation clicks couldn't
+  reliably target - a tooling limitation, not a product issue). Created one
+  incidental test account (`stripe-verify-20260709@example.com`, no completed
+  booking) in the production DB during verification - harmless, low priority
+  cleanup if noticed later.
+- 2026-07-09: Consolidated `.claude/settings.json` autoMode permission rules after
+  founder feedback that the system required intervention too often. Root causes
+  diagnosed: (1) the Executive Charter in CLAUDE.md and the harness's separate
+  auto-mode classifier don't share context - charter policy has to be re-encoded
+  as explicit classifier rules to actually reduce prompts; (2) writing/committing
+  permission-widening rules is itself gated ("self-modification"), requiring the
+  *exact* rule text confirmed, not general "go ahead" enthusiasm; (3) settings
+  changes need a `/hooks` reload or restart to take effect mid-session - a
+  mechanical gap, not a trust question. Founder gave one explicit, exact-text
+  sign-off covering: routine dev-loop commands, safe env-var writes,
+  review-gated `vercel deploy --prod`, standing `git push origin main` (matches
+  this repo's pre-existing no-PR-workflow convention), and creating/editing
+  `.claude/agents/*.md` for the non-money-tier roster only (Finance/Paid Ads
+  agent definitions still need per-instance review). Also added: any UI/runtime-
+  facing diff needs real claude-in-chrome browser verification before being
+  called done or before an autonomous deploy - automated tests alone aren't
+  sufficient evidence (precedent: the CSP header incident that broke all client
+  interactivity while passing every automated check).
+- 2026-07-09: Fixed missing Stripe env vars across Production/Preview/Development
+  (`STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`)
+  - was the confirmed cause of broken production booking/payment. Test-mode keys
+  provided by the founder; a Stripe webhook endpoint was created via the Stripe
+  API pointed at the production URL to obtain the webhook signing secret.
+  `.env.local` updated to match. Reversible, restorative, matched an established
+  pattern (missing config) - no escalation needed per the charter.
+- 2026-07-09: Executive Charter added to CLAUDE.md; this file created; Operations
+  agent stood up as the first functional agent in the roster.
+
+## Resolved escalation (archived, was struck-through in the live file)
+- **[RESOLVED 2026-07-09]** Switch production `DATABASE_URL` to Neon's
+  pooled endpoint - founder approved via exact-text confirmation; applied
+  across Production/Preview/Development, migration for `WaitlistSignup`
+  applied, prod redeployed, and a real waitlist signup verified end-to-end
+  against the live pooled DB afterward.
