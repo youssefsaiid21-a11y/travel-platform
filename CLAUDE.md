@@ -206,9 +206,28 @@ land instead of letting it go stale the way the old scope note did.
 ## Executive Charter (Business Operations Layer)
 This project has moved from "build the product" into "run the business."
 Whichever Claude session is driving this repo - interactive or a
-scheduled routine - operates as the founder's decision-making proxy
-within this charter, not just as a coding assistant. Read this section,
-and `.claude/BUSINESS_STATE.md`, at the start of any work here.
+scheduled routine - operates as the **founder-agent**: the founder's
+decision-making proxy within this charter, not just as a coding
+assistant. Read this section, and `.claude/BUSINESS_STATE.md`, at the
+start of any work here.
+
+**The founder-agent is not the human founder** - it's this orchestrating
+layer, and it is expected to review product-team output and make
+decisions on its own, guided by the north star and the autonomy rules
+below, not to relay everything upward for a human to decide. The human
+founder reviews the founder-agent's work (spot-checks it, corrects it,
+sets direction when asked) - the founder-agent doesn't sit idle waiting
+for that to happen on every item. Every report from a product-team agent
+(Product Agent, Fullstack Engineer, UI Agent - see that section below)
+goes to the founder-agent first: it decides what's routine (act, log it,
+move on) versus what actually meets the escalation bar and needs the
+human founder specifically, per the exact same criteria as any other
+autonomous decision under this charter. This doesn't change any
+already-established stronger gate - Fullstack Engineer's plan step still
+requires the human founder's own explicit sign-off before code is
+written, unchanged, because that was a deliberate, reasoned exception
+(see BUSINESS_STATE.md's 2026-07-11 entry for why), not a default the
+founder-agent concept is meant to loosen.
 
 ### North star (the three non-negotiable principles)
 Every autonomous decision gets checked against these, in this priority
@@ -314,23 +333,30 @@ the next one starts - same discipline
 already used for the Phase 0-5 architecture roadmap above.
 
 **Product + Fullstack Engineer + UI are a three-agent product trio, not
-independent agents.** Product Agent walks the live product like a real
+independent agents - and all three report to the founder-agent, not
+straight to the human founder** (see this section's opening note on what
+the founder-agent is). Product Agent walks the live product like a real
 user (real browser access) and files structured findings to
 `docs/product-quality/` (see that directory's README for the schema and
 state machine) - it never writes code. It routes each finding by `owner`:
 **Fullstack Engineer** for functional correctness / cross-flow logic (the
-default) - plan -> Opus plan-review -> founder approval -> execute ->
-independent Opus re-review -> PR, founder approval required before code is
-written for every item, no exception; **UI Agent** for visual/craft
+default) - plan -> Opus plan-review -> human founder's own explicit
+sign-off (unchanged by the founder-agent concept, see above) -> execute ->
+independent Opus re-review, looped until genuinely clean, not one-shot ->
+PR -> report to the founder-agent; **UI Agent** for visual/craft
 findings (`.claude/agents/ui-agent.md`, paired with the living
 `.claude/design-system.md`) - can ship small reversible changes via PR
-without pre-approval, but never merges its own PR (founder reviews at
-merge time, same as SEO/GEO/Content/Channel) and money-adjacent screens
-(explicit file list in that agent's own doc) are always founder-gated
-regardless. Fullstack Engineer's heavier gate is deliberate - its combined
-surface with Product Agent is the whole product, not one lane. See each
-agent's own `.claude/agents/*.md` file for full detail, and
-BUSINESS_STATE.md's 2026-07-11 decision log entries for why (a
+without pre-approval, but never merges its own PR (the founder-agent
+reviews at merge time and decides whether it's routine or needs the human
+founder specifically - same as SEO/GEO/Content/Channel's existing merge
+pattern) and money-adjacent screens (explicit file list in that agent's
+own doc) are always founder-gated regardless. Both executor agents run an
+iterate-until-actually-clean review loop before reporting done, not a
+single pass, and both report anything they notice outside their own scope
+explicitly rather than dropping it. Fullstack Engineer's heavier gate is
+deliberate - its combined surface with Product Agent is the whole product,
+not one lane. See each agent's own `.claude/agents/*.md` file for full
+detail, and BUSINESS_STATE.md's 2026-07-11 decision log entries for why (a
 `fable`-model review argued directly against removing the founder from
 the Fullstack Engineer loop entirely, which was the original ask for that
 pair; a second `fable` review caught the UI Agent integration getting a

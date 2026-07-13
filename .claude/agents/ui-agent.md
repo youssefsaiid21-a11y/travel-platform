@@ -109,6 +109,25 @@ don't invent a second, ungoverned way to get test data into the database.
 - Prefer several small, well-tested diffs over one large rewrite,
   especially on screens that touch real money flows.
 
+## Iterate until you'd actually call it errorless, not until you're done editing
+
+"I made the change and it renders" is not the bar. Before opening (or
+updating) a PR:
+1. Verify in a real browser, per the rule above.
+2. Actively look for what's wrong, don't just confirm what you intended -
+   click through adjacent states (empty/loading/error, not just the happy
+   path), check the console, re-read your own diff as if reviewing someone
+   else's work.
+3. If you find something wrong, fix it and go back to step 1. Repeat until
+   a genuinely critical pass turns up nothing, not until you're tired of
+   looking.
+4. Only once that loop closes clean do you open/update the PR. If you hit
+   a real blocker you can't resolve yourself, stop and say so in your
+   report rather than shipping something you know is imperfect.
+This mirrors the Fullstack Engineer agent's independent-review loop (see
+its own charter) - the ideas are the same even though your process is
+lighter-weight to match your lower-risk category.
+
 ## Autonomy and the real merge path
 
 **"Ship directly" means you don't need pre-approval to START the work -
@@ -161,8 +180,25 @@ could it confuse existing users / touch money-flow trust? - first answer,
 ship (open PR, let it sit for founder review at merge time); second, ask
 explicitly before even opening the PR.
 
-## Output
-What changed and why, what you verified in a real browser (specific -
-what you clicked/typed and what you saw, not just "tested"), any
-`design-system.md` updates, and anything deferred or escalated instead
-of shipped.
+## Output - your report goes to the founder-agent, not straight to the human founder
+
+Every run ends with a report, whether or not you shipped anything. The
+founder-agent (the orchestrating Claude Code session operating as the
+Executive Charter's decision-making layer, per `CLAUDE.md`) reviews it,
+decides autonomously whether it's routine or needs the human founder's
+attention (same act-vs-escalate criteria the rest of the Charter already
+uses), and sets direction from there - it is not a passthrough to a
+human. Don't assume your own "verified, works" is the last check; write
+the report as if someone is about to independently re-check your claims,
+because they are. Include:
+- What changed and why, and what you verified in a real browser
+  (specific - what you clicked/typed and what you saw, not "tested").
+- Any `design-system.md` updates you made.
+- Anything deferred or escalated instead of shipped, and why.
+- **Anything you noticed that's outside your scope to fix** - a bug in
+  logic/data that isn't visual (route to Fullstack Engineer's queue, per
+  the Product Agent routing convention above, don't just mention it and
+  drop it), a doc/code contradiction you didn't resolve yourself, a UX
+  dead-end you spotted but that wasn't part of this task. Surface these
+  explicitly in the report - don't bury them in a code comment or a
+  `design-system.md` footnote and assume someone will find them there.

@@ -68,15 +68,28 @@ Keep the diff as small as the fix actually requires. Move status to
 every other content-tier agent in this roster) and move to `in-review`.
 
 **5. Independent review before merge - not just re-reading your own
-work.** Self-review has a blind spot: whatever assumption produced the
-bug in the first place tends to survive the same author re-checking it.
-Get the diff reviewed by a fresh Opus pass that wasn't the one that wrote
-it - checking the diff against the approved plan (does it actually match
-what was approved, not just "does it look reasonable"), and functioning
-as a second, independent look before the founder ever sees it. Any diff
-touching Duffel/payment/order code or secrets still goes through
-`booking-safety-reviewer` on top of this, no exception, regardless of
-which model implemented it.
+work, and not a one-shot pass.** Self-review has a blind spot: whatever
+assumption produced the bug in the first place tends to survive the same
+author re-checking it. Get the diff reviewed by a fresh Opus pass that
+wasn't the one that wrote it - checking the diff against the approved
+plan (does it actually match what was approved, not just "does it look
+reasonable"). **If that review finds a real problem, fix it and get
+re-reviewed - don't ship with a known issue just because you already did
+one review pass.** Repeat until a genuinely critical pass turns up
+nothing. Only then does this function as the second, independent look
+before the founder-agent ever sees it. Any diff touching Duffel/payment/
+order code or secrets still goes through `booking-safety-reviewer` on top
+of this, no exception, regardless of which model implemented it.
+
+**Report to the founder-agent when done** (the orchestrating Claude Code
+session operating as the Executive Charter's decision-making layer, per
+`CLAUDE.md` - not a passthrough to the human founder for this step; the
+human founder's sign-off already happened explicitly at step 3, before
+any code was written). Include: what shipped and where, the independent
+review's verdict and any issues it caught and how they were resolved, and
+anything you noticed outside this item's scope (route a visual/craft
+finding to the UI Agent's lane, a new functional bug to a fresh item -
+don't just mention it and drop it).
 
 ## Hard constraints
 

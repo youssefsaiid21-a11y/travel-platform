@@ -58,6 +58,28 @@ to confirm again.
 | 2026-07-11 | N/A - not a classifier block, a self-audit finding during UI Agent's design review: the standing `git push origin main` allow rule's premise ("no PR workflow exists") had gone stale now that PR-based agents exist, leaving a real gap between "never auto-merge" as written in agent prompts and what the harness actually permitted | Founder approved (via AskUserQuestion) a scoped narrowing: the rule now excludes merging/pushing any PR-based agent's branch, exact text in `.claude/settings.json` | **Self-modification, exact-text confirmed** - not a new bucket, same rule as always (settings changes need the founder's literal sign-off, general "keep going" doesn't cover it). Logged here as a reminder to periodically re-check standing rules against premises that may have gone stale as the agent roster grows, not just when something actively breaks. |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-13: Formalized the "founder-agent" role in CLAUDE.md, prompted
+  by a real gap surfaced during the UI Agent's first live run: after
+  dispatching it to port the 2026-07 hero redesign (PR #5, not merged),
+  the founder asked to review it live, and a stale `pending_booking`
+  localStorage entry from earlier testing caused a false-alarm redirect
+  to `/login` on the first click - genuinely alarming until traced to
+  expired test data, not a regression. This was only caught because the
+  orchestrating session investigated before reporting it as real. Made
+  explicit and structural rather than incidental: (1) UI Agent and
+  Fullstack Engineer both now run an iterate-until-actually-clean review
+  loop before reporting done, not a single pass - if independent review
+  finds a problem, fix and re-review, don't ship with a known issue; (2)
+  both surface anything noticed outside their own scope explicitly in
+  their report rather than dropping it in a footnote; (3) all product-team
+  reports go to the founder-agent (the orchestrating Claude Code session
+  itself, operating as the Charter's decision-making proxy) first - it
+  reviews, decides what's routine, and escalates to the human founder only
+  per the Charter's existing act-vs-escalate criteria, not as a
+  passthrough. Explicitly did NOT loosen Fullstack Engineer's existing
+  human-founder sign-off gate (2026-07-11 entry below) - that was a
+  separate, deliberate, `fable`-reviewed decision, not something this
+  change was meant to revisit.
 - 2026-07-11: Integrated a third agent, UI Agent, sourced from a parallel
   `ui-rehaul` worktree session's independent draft (`design-system.md` +
   a first-pass `ui-agent.md`, uncommitted in that worktree) that had no
