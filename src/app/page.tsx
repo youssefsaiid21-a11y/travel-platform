@@ -7,7 +7,7 @@ import { OfferList } from "@/components/OfferList";
 import { OfferCardSkeleton } from "@/components/OfferCard";
 import { PriceCalendarSection } from "@/components/PriceCalendarSection";
 import { ExploreResults } from "@/components/ExploreResults";
-import { OrbiWordmark, OrbiMark } from "@/components/OrbiLogo";
+import { OrbiMark } from "@/components/OrbiLogo";
 import { FlightPath } from "@/components/FlightPath";
 import { consumeChatStream } from "@/lib/chat/consumeChatStream";
 import type { NormalizedOffer } from "@/lib/duffel/types";
@@ -45,15 +45,6 @@ const EXAMPLE_QUERIES = [
   "Non-stop Sydney to London in August",
   "3 passengers Toronto to Amsterdam Sep 1st",
   "Cheap flights from London this weekend, anywhere",
-];
-
-const POPULAR_ROUTES = [
-  { from: "LHR", to: "JFK", label: "London → New York", query: "London to New York next Friday" },
-  { from: "DXB", to: "BKK", label: "Dubai → Bangkok", query: "Dubai to Bangkok next month" },
-  { from: "CDG", to: "NRT", label: "Paris → Tokyo", query: "Paris to Tokyo business class" },
-  { from: "SYD", to: "SIN", label: "Sydney → Singapore", query: "Sydney to Singapore economy" },
-  { from: "AMS", to: "LIS", label: "Amsterdam → Lisbon", query: "Amsterdam to Lisbon this weekend" },
-  { from: "YYZ", to: "BCN", label: "Toronto → Barcelona", query: "Toronto to Barcelona in summer" },
 ];
 
 const MAX_RECENT = 5;
@@ -451,7 +442,7 @@ export default function Home() {
         placeholder={
           hasSearched
             ? "Refine search or ask something new…"
-            : "Where do you want to fly?"
+            : EXAMPLE_QUERIES[0]
         }
         disabled={loading}
         autoFocus
@@ -469,88 +460,115 @@ export default function Home() {
         className={hasSearched ? styles.button : styles.heroButton}
         disabled={loading || !input.trim()}
       >
-        {loading ? "Searching…" : "Search"}
+        {loading ? (
+          "Searching…"
+        ) : (
+          <>
+            Search
+            {!hasSearched && (
+              <span className={styles.heroButtonArrow} aria-hidden="true">→</span>
+            )}
+          </>
+        )}
       </button>
     </form>
   );
 
   return (
     <div className={styles.page}>
-      <main className={styles.messages} aria-label="Flight search results" aria-live="off" aria-busy={loading}>
-        {!hasSearched && (
-          <div className={styles.hero}>
-            <div className={styles.heroLogo}><OrbiWordmark /></div>
-            <p className={styles.heroTagline}>Search real flights with plain English</p>
-            <p className={styles.heroSub}>
-              Save your details once - book any flight in under a minute, for life.
-            </p>
-            <div className={styles.heroFormWrapper}>
-              {searchForm}
-              {input.length >= 280 && (
-                <p className={styles.charWarning}>
-                  {input.length} chars - try to keep queries concise for best results
-                </p>
-              )}
-            </div>
-            <div className={styles.examples}>
-              {EXAMPLE_QUERIES.map((q) => (
-                <button
-                  key={q}
-                  className={styles.exampleChip}
-                  onClick={() => sendMessage(q)}
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-
-            {recentSearches.length > 0 && (
-              <div className={styles.recentSection}>
-                <div className={styles.recentHeader}>
-                  <p className={styles.recentHeading}>Recent</p>
-                  <button
-                    className={styles.clearRecent}
-                    onClick={() => {
-                      setRecentSearches([]);
-                      try { localStorage.removeItem("recent_searches"); } catch { /* ignore */ }
-                    }}
-                    aria-label="Clear recent searches"
-                  >
-                    Clear
-                  </button>
-                </div>
-                <div className={styles.recentChips}>
-                  {recentSearches.map((s) => (
-                    <button
-                      key={s}
-                      className={styles.recentChip}
-                      onClick={() => sendMessage(s)}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+      {!hasSearched && (
+        <main className={styles.heroSection} aria-label="Flight search">
+          <div className={styles.heroDeco} aria-hidden="true">
+            <OrbiMark tone="mono" />
+          </div>
+          <div className={styles.heroInner}>
+            <div className={styles.heroContent}>
+              <h1 className={styles.heroHeadline}>
+                where to next?<br />book it in a minute.
+              </h1>
+              <p className={styles.heroSubhead}>
+                Save your details once. Every flight after that books in under a minute.
+              </p>
+              <div className={styles.heroFormWrapper}>
+                {searchForm}
+                {input.length >= 280 && (
+                  <p className={styles.charWarning}>
+                    {input.length} chars - try to keep queries concise for best results
+                  </p>
+                )}
               </div>
-            )}
-
-            <div className={styles.popularSection}>
-              <p className={styles.popularHeading}>Popular routes</p>
-              <div className={styles.popularGrid}>
-                {POPULAR_ROUTES.map((r) => (
+              <div className={styles.examples}>
+                {EXAMPLE_QUERIES.slice(1).map((q) => (
                   <button
-                    key={r.label}
-                    className={styles.popularCard}
-                    onClick={() => sendMessage(r.query)}
+                    key={q}
+                    className={styles.exampleChip}
+                    onClick={() => sendMessage(q)}
                   >
-                    <span className={styles.popularRoute}>{r.label}</span>
-                    <span className={styles.popularLabel}>{r.from} → {r.to}</span>
+                    {q}
                   </button>
                 ))}
               </div>
+
+              {recentSearches.length > 0 && (
+                <div className={styles.recentSection}>
+                  <div className={styles.recentHeader}>
+                    <p className={styles.recentHeading}>Recent</p>
+                    <button
+                      className={styles.clearRecent}
+                      onClick={() => {
+                        setRecentSearches([]);
+                        try { localStorage.removeItem("recent_searches"); } catch { /* ignore */ }
+                      }}
+                      aria-label="Clear recent searches"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className={styles.recentChips}>
+                    {recentSearches.map((s) => (
+                      <button
+                        key={s}
+                        className={styles.recentChip}
+                        onClick={() => sendMessage(s)}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className={styles.trustBar}>
+                <span className={styles.trustItem}>
+                  You confirm every price before anything is booked
+                </span>
+                <span className={styles.trustDot} aria-hidden="true" />
+                <span className={styles.trustItem}>Real fares from 300+ airlines</span>
+                <span className={styles.trustDot} aria-hidden="true" />
+                <span className={styles.trustItem}>
+                  <svg
+                    className={styles.trustLock}
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="4" y="11" width="16" height="10" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                  </svg>
+                  Secured by Stripe
+                </span>
+              </div>
             </div>
           </div>
-        )}
+        </main>
+      )}
 
+      {hasSearched && (
+      <main className={styles.messages} aria-label="Flight search results" aria-live="off" aria-busy={loading}>
         {messages.map((msg, i) => {
           const isLastAssistant = i === lastAssistantIdx;
 
@@ -746,6 +764,7 @@ export default function Home() {
 
         <div ref={bottomRef} />
       </main>
+      )}
 
       <div aria-live="polite" aria-atomic="true" className={styles.srOnly}>
         {statusMsg || (loading ? "Searching for flights" : "")}
