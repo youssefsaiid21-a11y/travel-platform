@@ -5,12 +5,19 @@ redesign session (2026-07). Update this file whenever you learn something
 that would have changed how you approached a change - this is the
 BUSINESS_STATE.md equivalent for UI decisions, not a one-time spec.
 
-**Status note**: the hero redesign this doc is distilled from exists only
-as a standalone preview file from that session - it has NOT been ported
-into the real app's components yet. Don't assume the live homepage
-already matches these principles; verify against the actual current code.
-Porting that preview into real `.tsx`/`.module.css` files is expected to
-be this agent's first real task, not something already done.
+**Status note**: the hero has now been ported into the real app
+(`src/app/page.tsx` + `src/app/page.module.css`, PR `ui/hero-port-2026-07`,
+2026-07). The empty-state hero is now a full-bleed, left-aligned layout
+(big lowercase headline "where to next? / book it in a minute.", NL search
+bar, real-`EXAMPLE_QUERIES` chips, trust bar, decorative watermark of the
+brand mark). The chat/checkpoint/offer flow below is unchanged. Two
+deliberate departures from the old centered hero: the wordmark is no longer
+repeated in the hero body (it already lives in the global `NavBar`), and the
+"Popular routes" grid was dropped (it was a second click-to-search
+affordance duplicating the example chips - the vibecoded checklist's "2+
+competing click-instead-of-typing affordances" tell). Recent-searches was
+kept. The nav in the reference screenshot is the existing global `NavBar`,
+not a hero-local element - don't rebuild it.
 
 ## Brand tokens (defined in `src/app/globals.css` - use `var(--x)`, never hardcode hex)
 - Accent: `--accent` #0284c7, `--accent-light` #38bdf8, `--accent-dark` #0369a1
@@ -37,9 +44,17 @@ be this agent's first real task, not something already done.
   element. Don't stack a blur shadow + a colored glow ring on the same
   element unless it's a genuine singular focal point - and even then,
   one only.
-- Font: Inter, self-hosted via `@fontsource/inter` - only 400/500/600/700
-  are actually loaded. Never set `font-weight: 800` (or anything not in
-  that list); the browser fake-bolds it and it looks synthesized up close.
+- Font: Inter, self-hosted via `@fontsource/inter`. The prose here long
+  said "only 400/500/600/700 are loaded, never use 800 (it fake-bolds),"
+  but that is contradicted by the actual shipped code: `globals.css` DOES
+  `@import "@fontsource/inter/800.css"`, and `NavBar.brand` (and the old
+  hero logo) render at `font-weight: 800` against a real, loaded 800 face -
+  so it is NOT synthesized there. This is an unreconciled doc/code drift.
+  Until a founder decision reconciles it (either drop the 800 import + drop
+  800 from NavBar, or bless 800 as a loaded weight), new work should stay at
+  700 for headings to be safe under either outcome - the 2026-07 hero
+  headline is 700 for exactly this reason. Don't set a weight that isn't
+  imported, whatever the resolution.
 
 ## Motion philosophy
 - Decorative, ambient motion (a slow background rotation, a subtle
@@ -83,6 +98,15 @@ be this agent's first real task, not something already done.
   check `EXAMPLE_QUERIES` in `src/app/page.tsx` for the established voice.
 
 ## Process discipline (the most important section)
+- **A vertically-centered full-height section that can overflow must not
+  center with `justify-content: center`.** When the content is taller than
+  the viewport (e.g. the hero for a returning user with recent searches),
+  flex `justify-content: center` clips the top (the headline) *unreachably*
+  - you cannot scroll up to it. Use `margin-block: auto` on the content
+  block inside a `flex-direction: column` container instead: it centers when
+  there's spare room and collapses to top-aligned + fully scrollable when
+  there isn't. Found live in the 2026-07 hero port; invisible from source,
+  only caught by rendering with enough content to overflow.
 - **Never call a UI change correct because the code looks right.** Every
   real bug found this session - mojibake from a missing charset, an input
   silently overflowing into its neighbor, a divider rendering in the
@@ -102,11 +126,27 @@ be this agent's first real task, not something already done.
   orphaned CSS and dangling `document.getElementById(...)` calls.
 - Known tooling quirks (verify, don't assume they still apply): a browser
   resize tool may not actually change the effective CSS viewport - if
-  layout doesn't respond, check `window.innerWidth` directly, and test a
-  specific width via an iframe with explicit `width`/`height` instead.
-  CSS animations can report `playState: "running"` while frozen at
-  `currentTime: 0` in a backgrounded/automated tab - that's tab-throttling,
-  not broken CSS; verify via computed style + the Web Animations API.
+  layout doesn't respond, check `window.innerWidth` directly. Confirmed
+  again 2026-07: in the claude-in-chrome automated tab, `window.innerWidth`
+  was hard-locked at 800 (dpr 2) - `resize_window` (up to 1440 and down to
+  400) AND keyboard page-zoom both left it at 800. The iframe-with-explicit-
+  width workaround also failed: this app refuses to be framed
+  (X-Frame-Options / `frame-ancestors`), so a same-origin `<iframe src="/">`
+  renders a broken-doc icon, and a full-viewport cross-origin iframe breaks
+  the screenshot tool's page targeting. The workaround that DID work to see
+  the mobile branch render for real: temporarily widen the mobile
+  breakpoint (e.g. `@media (max-width: 620px)` -> `900px`), reload, screenshot
+  at the locked 800 width, verify the mobile reflow, then revert the
+  breakpoint. Also: `backdrop-filter` computes to `none` in this automated
+  Chrome even though `CSS.supports` returns true and the rule is in the
+  sheet - GPU/backdrop compositing is disabled in the automated build, so
+  you can't confirm frosted-glass blur via computed style there; confirm the
+  glass via the (real, semi-transparent) `background` token + a visual check
+  that the aurora bleeds through, and trust that the blur composites on real
+  user browsers. CSS animations can report `playState: "running"` while
+  frozen at `currentTime: 0` in a backgrounded/automated tab - that's
+  tab-throttling, not broken CSS; verify via computed style + the Web
+  Animations API.
 
 ## "Reads as vibecoded" self-audit checklist
 - [ ] Same gradient reused on 3+ unrelated elements? -> one deliberate moment only.
