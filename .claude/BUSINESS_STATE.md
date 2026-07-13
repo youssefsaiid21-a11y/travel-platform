@@ -42,7 +42,7 @@ exists and will populate from here on.
 | Paid Ads | deleted 2026-07-11 | founder call - not worth carrying a drafted agent for a channel that's not active; re-add if/when paid acquisition becomes a real priority |
 | Product | drafted, NOT run | `.claude/agents/product-agent.md` - diagnostic-only, walks real flows via live browser, files findings to `docs/product-quality/`; never touches code. Needs a first real run + review before it's routine. |
 | Fullstack Engineer | drafted, NOT run | `.claude/agents/fullstack-engineer-agent.md` - executes the Product Agent's queue; every item needs founder plan-approval before code is written, no exception yet. Needs a first real run + review before it's routine. |
-| UI | drafted, NOT run | `.claude/agents/ui-agent.md` - owns visual/UX craft layer product-wide, paired with `.claude/design-system.md`. Ships small reversible changes via PR (never merges its own PR - founder reviews at merge time, same as SEO/GEO/Content/Channel); money-adjacent screens and its first task (porting the 2026-07 hero redesign into real code) are founder-gated regardless. Sourced from a parallel `ui-rehaul` worktree session, integrated 2026-07-11 after a Fable review found real gaps (missing browser tools in its own tool grant, no environment-safety constraint, a stale harness push-rule undermining "never auto-merge") - all fixed before this row was added. Needs a first real run + review before it's routine, same as Product/Fullstack Engineer. |
+| UI | first run merged 2026-07-13, live in `main` | `.claude/agents/ui-agent.md` - owns visual/UX craft layer product-wide, paired with `.claude/design-system.md`. First task (porting the 2026-07 hero redesign, PR #5) reviewed live by the human founder per its escalate-first carve-out, then merged - that exception is now spent. Going forward, small reversible changes in its normal category are the founder-agent's to approve and log, not the human founder's, per the 2026-07-13 founder-agent clarification below. Money-adjacent screens (explicit file list in its own doc) stay founder-gated regardless, no exception. Not yet deployed to production - that's a separate, still-pending step. |
 
 ## Harness calibration log
 Every time the auto-mode classifier blocks something, record it here once
@@ -58,6 +58,24 @@ to confirm again.
 | 2026-07-11 | N/A - not a classifier block, a self-audit finding during UI Agent's design review: the standing `git push origin main` allow rule's premise ("no PR workflow exists") had gone stale now that PR-based agents exist, leaving a real gap between "never auto-merge" as written in agent prompts and what the harness actually permitted | Founder approved (via AskUserQuestion) a scoped narrowing: the rule now excludes merging/pushing any PR-based agent's branch, exact text in `.claude/settings.json` | **Self-modification, exact-text confirmed** - not a new bucket, same rule as always (settings changes need the founder's literal sign-off, general "keep going" doesn't cover it). Logged here as a reminder to periodically re-check standing rules against premises that may have gone stale as the agent roster grows, not just when something actively breaks. |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-13: Human founder reviewed PR #5 (the hero port) live in browser
+  and approved merging it. Rebased onto current `main` first (2 commits
+  had landed since the branch forked - the founder-agent role formalization
+  below - no file overlap, clean rebase), re-ran the full gate (lint, tsc,
+  445 tests) on the rebased result, merged, deleted the branch. Live in
+  `main`, not yet deployed to production (separate step, still pending).
+  Also: the human founder explicitly reaffirmed and sharpened the
+  founder-agent operating model in the same turn - founder-agent is to be
+  the one approving routine work, giving the product-tier agents
+  recommendations, improving their own definitions, and reviewing their
+  output going forward; the human founder is deliberately not in that
+  day-to-day loop. This matches (doesn't change) what was formalized
+  below - restated here because it was raised as a direct, pointed
+  correction ("why are u asking me and not the founder agent?") after this
+  session defaulted to asking about the PR merge out of habit rather than
+  applying the just-written rule. The PR merge itself was correctly
+  escalated regardless (UI Agent's first-run carve-out, now spent) - the
+  correction was about everything *after* this specific exception.
 - 2026-07-13: Formalized the "founder-agent" role in CLAUDE.md, prompted
   by a real gap surfaced during the UI Agent's first live run: after
   dispatching it to port the 2026-07 hero redesign (PR #5, not merged),
