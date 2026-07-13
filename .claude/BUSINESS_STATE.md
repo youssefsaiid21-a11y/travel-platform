@@ -58,6 +58,19 @@ to confirm again.
 | 2026-07-11 | N/A - not a classifier block, a self-audit finding during UI Agent's design review: the standing `git push origin main` allow rule's premise ("no PR workflow exists") had gone stale now that PR-based agents exist, leaving a real gap between "never auto-merge" as written in agent prompts and what the harness actually permitted | Founder approved (via AskUserQuestion) a scoped narrowing: the rule now excludes merging/pushing any PR-based agent's branch, exact text in `.claude/settings.json` | **Self-modification, exact-text confirmed** - not a new bucket, same rule as always (settings changes need the founder's literal sign-off, general "keep going" doesn't cover it). Logged here as a reminder to periodically re-check standing rules against premises that may have gone stale as the agent roster grows, not just when something actively breaks. |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-13: Deployed to production per explicit founder go-ahead.
+  Production had been stale since `da328ce` (the admin-local-only fix) -
+  24 files, +2021/-480 accumulated since: Paid Ads deletion, Product Agent
+  + Fullstack Engineer + Playwright e2e suite, the BUSINESS_STATE archival
+  pass, the Product Agent gap-list fixes, UI Agent + design-system.md +
+  the founder-agent formalization, and the hero port. Review gate: lint/
+  tsc/445-tests clean on HEAD; diff-since-last-deploy checked for any
+  Duffel/Stripe/order/secret-handling touch (none found, so
+  booking-safety-reviewer wasn't triggered); the one real user-facing
+  change (the hero) was already verified live in a real browser earlier
+  the same session. Deployed, then confirmed via `/api/version` and a
+  direct content check that production is actually serving the new hero
+  copy, not just reporting the right commit.
 - 2026-07-13: Human founder reviewed PR #5 (the hero port) live in browser
   and approved merging it. Rebased onto current `main` first (2 commits
   had landed since the branch forked - the founder-agent role formalization
