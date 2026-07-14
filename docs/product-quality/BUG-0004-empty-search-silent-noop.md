@@ -94,5 +94,7 @@ Not money-adjacent: touches only `src/app/page.tsx`'s hero search form,
 no `src/app/booking/**`, no `StripeCheckout`, no price/itemization
 display, no trust signal changed.
 
-Status: **`in-review`**. PR opened (link in the founder-agent's run
-report) - not merged by this agent, per protocol.
+Status: **`in-review`**. PR opened:
+https://github.com/youssefsaiid21-a11y/travel-platform/pull/10
+(branch `fix/bug-0004-empty-search-enter-hint`) - not merged by this
+agent, per protocol.
