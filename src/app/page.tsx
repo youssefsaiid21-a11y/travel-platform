@@ -845,14 +845,17 @@ export default function Home() {
   }
 
   function handleSelectOffer(offer: NormalizedOffer, searchParams?: SearchParams | null) {
-    if (!session?.user) {
-      router.push("/login?callbackUrl=/booking/confirm");
-      return;
-    }
+    // Persist the selected offer BEFORE any redirect so it survives the
+    // logged-out -> /login -> /booking/confirm round trip (BUG-0001). The
+    // callbackUrl brings the user back to /booking/confirm, which reads this.
     localStorage.setItem(
       "pending_booking",
       JSON.stringify({ offer, searchParams: searchParams ?? {} })
     );
+    if (!session?.user) {
+      router.push("/login?callbackUrl=/booking/confirm");
+      return;
+    }
     router.push("/booking/confirm");
   }
 }

@@ -1,7 +1,7 @@
 ---
 id: BUG-0001
 type: bug
-status: in-progress
+status: in-review
 flow: checkout
 severity: blocks-booking
 owner: fullstack-engineer
@@ -365,3 +365,45 @@ assumed) to touch no Duffel/payment/order/secret code, so
 `booking-safety-reviewer` will not be required at execution. First item
 approved under this tier, immediately following BUG-0002's clean run through
 the full human-gated loop. Status moved to `approved`.
+
+---
+
+## Execution & verification (Fullstack Engineer, 2026-07-14)
+
+Implemented exactly as planned - one hoist in `src/app/page.tsx`'s
+`handleSelectOffer`, identical payload/key, comment matching the plan
+verbatim. No other file touched.
+
+**Gate:** `npm test` - 448 passed / 3 pre-existing skips (unrelated), all
+59 test files green. `npx tsc --noEmit` - clean. `npm run lint` - clean.
+
+**Real browser verification (local dev, Neon `dev` branch, never
+production)** - mandatory per the plan and CLAUDE.md's user-facing-change
+rule, not satisfied by tests alone:
+- **Fix path:** logged out, searched "London to Berlin next Tuesday",
+  confirmed the LHR->BER checkpoint, selected the Duffel Airways €62.12
+  offer. Confirmed via `localStorage.getItem("pending_booking")` that the
+  offer was persisted *before* the redirect fired. Landed on
+  `/login?callbackUrl=/booking/confirm` as before. Signed in with the
+  seeded `product-agent-test@orbi.local` account (password reset via the
+  sanctioned `scripts/seed-product-agent-account.mjs`, which refused to
+  run against anything but the `dev` branch host). Landed on
+  `/booking/confirm` with the flight, price breakdown, and passenger form
+  fully rendered - not bounced to `/`.
+- **Regression guard:** while already signed in as the same account, ran a
+  second fresh search ("London to Berlin next Tuesday" again) and selected
+  the British Airways €62.97 offer - went straight to `/booking/confirm`
+  with full details rendered, no login round trip, exactly as before this
+  change.
+- Noted, not caused by this change: the NL parser ("Could not parse flight
+  search from your message") failed transiently 3 times in a row during
+  this session before succeeding on retry with the identical phrase - this
+  matches the already-documented Z.AI tool-call flakiness in CLAUDE.md's
+  Phase 3 section, occurs entirely upstream of `handleSelectOffer`, and
+  `/api/chat` returned `200` on every one of those calls (parse failure,
+  not a request failure). Also observed: harmless dev-only React hydration
+  console warnings caused by a browser extension (Grammarly-style DOM
+  attribute injection, `bis_skin_checked`/`data-gr-ext-installed`),
+  unrelated to this change or any app code.
+
+Status moved to `in-review`.
