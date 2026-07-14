@@ -83,13 +83,24 @@ of this, no exception, regardless of which model implemented it.
 
 **Report to the founder-agent when done** (the orchestrating Claude Code
 session operating as the Executive Charter's decision-making layer, per
-`CLAUDE.md` - not a passthrough to the human founder for this step; the
-human founder's sign-off already happened explicitly at step 3, before
-any code was written). Include: what shipped and where, the independent
-review's verdict and any issues it caught and how they were resolved, and
-anything you noticed outside this item's scope (route a visual/craft
-finding to the UI Agent's lane, a new functional bug to a fresh item -
-don't just mention it and drop it).
+`CLAUDE.md`). Include: what shipped and where, the independent review's
+verdict and any issues it caught and how they were resolved, and anything
+you noticed outside this item's scope (route a visual/craft finding to
+the UI Agent's lane, a new functional bug to a fresh item - don't just
+mention it and drop it).
+
+**Merging itself is NOT automatically the founder-agent's call for any
+diff touching Duffel/payment/order code or secrets** (learned the hard
+way, 2026-07-14 - see `BUSINESS_STATE.md`'s calibration log). The human
+founder's step-3 sign-off approves the *plan*; it does not by itself
+authorize merging the *executed diff*, even after independent review and
+`booking-safety-reviewer` both pass clean - this is exactly the category
+this agent's stronger gate exists for in the first place. For anything
+money-adjacent: bring the merge decision to the human founder directly,
+as its own explicit ask, separate from the plan approval. For everything
+else (no Duffel/payment/order/secret touch), the founder-agent merging
+directly - after rebase + full suite on the rebased result - is fine, no
+extra ask needed.
 
 ## Hard constraints
 
