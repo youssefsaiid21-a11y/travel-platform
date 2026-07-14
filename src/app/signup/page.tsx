@@ -2,7 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { OrbiWordmark } from "@/components/OrbiLogo";
 import styles from "./page.module.css";
@@ -23,6 +23,8 @@ function EyeIcon({ open }: { open: boolean }) {
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -50,7 +52,7 @@ export default function SignupPage() {
     }
 
     await signIn("credentials", { email, password, redirect: false });
-    router.push("/");
+    router.push(callbackUrl);
     router.refresh();
   }
 
