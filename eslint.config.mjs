@@ -15,6 +15,12 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "playwright-report/**",
     "test-results/**",
+    // .claude/worktrees/ holds background-agent git worktrees (full repo
+    // checkouts, each with its own .next/**) - the patterns above only
+    // match at repo root, not nested under here, so a running agent's
+    // worktree pollutes any lint run from the main checkout with its own
+    // build output (found 2026-07-15 while verifying PR #10).
+    ".claude/worktrees/**",
   ]),
 ]);
 

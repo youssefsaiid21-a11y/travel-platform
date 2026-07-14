@@ -8,7 +8,13 @@ export default defineConfig({
     // e2e/ holds real Playwright specs (run via `npm run test:e2e`, a
     // separate browser-automation tool with its own test/expect globals) -
     // Vitest's default *.spec.ts glob would otherwise try to run them too.
-    exclude: ["**/node_modules/**", "**/e2e/**"],
+    // .claude/worktrees/ holds background-agent git worktrees (full repo
+    // checkouts) - without this, a concurrently running agent's worktree
+    // gets picked up as a second/third copy of the whole suite, causing
+    // spurious DB-contention failures in tests that mutate shared dev-DB
+    // state (found 2026-07-15 while verifying PR #10 against a live
+    // BUG-0006/0007 worktree).
+    exclude: ["**/node_modules/**", "**/e2e/**", "**/.claude/worktrees/**"],
     // Tests that hit routes touching getStripe() mock the `stripe` package
     // itself, but getStripe() still checks STRIPE_SECRET_KEY is non-empty
     // before constructing the (mocked) client - stub a placeholder so that
