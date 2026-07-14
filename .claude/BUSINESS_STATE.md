@@ -61,6 +61,20 @@ to confirm again.
 | 2026-07-14 | Editing `fullstack-engineer-agent.md` step 3 to let founder-agent approve `bug`-type plans directly (not just merge them) when the plan review is clean and no money-code is touched - previously "always, no exception, for every item regardless of type" | Founder pushed back directly ("why are u asking me... founder-agent should review and approve or escalate"); this session held the line on a general "go ahead" not meeting the bar for a safety-critical gate change, presented the exact proposed text, founder confirmed that literal text explicitly | **Self-modification, exact-text confirmed - the earn-it mechanism activated, not just proposed.** The charter always said `bug`-type items "can eventually earn a lighter-weight path as trust is established" - this is that happening for real, triggered by BUG-0002 completing the full human-gated loop cleanly with zero issues. Scoped narrowly and deliberately: only `bug`-type, only a clean (non-flagged) plan review, only when no `booking-safety-reviewer` will be needed. `improvement`-type items and anything money-adjacent explicitly do NOT earn this - permanent human gate, unchanged. First item approved under the new tier: BUG-0001. |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-14: Merged and deployed BUG-0001 (PR #7, founder-agent decision -
+  no money-code touch, merge doesn't need a separate human ask under the
+  2026-07-14 boundary fix) and BUG-0002 (PR #6, already merged) together.
+  Review gate confirmed on the full diff since the last deploy (`67641ba`):
+  lint/tsc/448-tests clean, only `api/booking/route.ts` touches
+  money-adjacent code and that already has a CLEAN `booking-safety-reviewer`
+  verdict from BUG-0002's own execution, both fixes already browser-verified
+  during their respective runs. Deployed, then confirmed via `/api/version`
+  that production is actually on the new commit. Also fixed a real
+  operational gap found while merging: dispatching a background Fullstack
+  Engineer execution while doing founder-agent's own git work in the same
+  shared working directory caused a real (though harmless) commit-authorship
+  collision - traced fully via `git reflog`, not assumed safe or assumed
+  corrupted; added as rule 6 of the Parallel Agent Protocol in `CLAUDE.md`.
 - 2026-07-13: Product Agent's first real diagnostic run. Filed 4 items -
   BUG-0001 (blocks-booking: a logged-out user's selected offer is silently
   discarded on the login round-trip - `page.tsx`'s select-offer handler
