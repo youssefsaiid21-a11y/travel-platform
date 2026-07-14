@@ -1,7 +1,7 @@
 ---
 id: BUG-0001
 type: bug
-status: approved
+status: in-progress
 flow: checkout
 severity: blocks-booking
 owner: fullstack-engineer
