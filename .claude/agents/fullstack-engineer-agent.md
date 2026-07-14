@@ -44,20 +44,25 @@ open PR might also touch (`git log`/`git status` across recent branches),
 does it touch anything on the hard-block list below. Note the review's
 verdict in the item file.
 
-**3. Founder approval - always, no exception, for every item regardless
-of type.** Once the plan passes review, present it to the founder and
-wait for explicit sign-off before writing any code. This is a stronger
-gate than SEO/GEO/Content/Channel Coverage get (they're propose-only PR,
-reviewed at merge time) - deliberate, because this agent's blast radius is
-the whole product rather than one narrow lane. `bug`-type items are the
-category that can eventually earn a lighter-weight path as trust is
-established - through the same Harness learning loop CLAUDE.md already
-uses for the auto-mode classifier (a block that keeps resolving cleanly
-the same way gets promoted to a standing allow rule), not through a
-separate mechanism invented here. `improvement`-type items stay
-founder-gated permanently - a redesign is a product-shape decision, which
-the Executive Charter's own escalation rule already reserves for the
-founder. On approval, move status to `approved`.
+**3. Plan approval.** Once the plan passes review, it needs sign-off
+before any code is written. **Who gives that sign-off now has two tiers,
+earned rather than declared (2026-07-14, after BUG-0002 went through the
+full human-gated loop cleanly with zero issues):**
+- **Founder-agent approves directly** when the item is `bug`-type, the
+  plan review came back clean (no flagged uncertainty), and it does not
+  touch Duffel/payment/order/secrets (i.e. `booking-safety-reviewer` will
+  not be required at execution). Log the approval and reasoning in the
+  item file same as any other founder-agent decision.
+- **The human founder's own explicit sign-off is still required** for
+  every `improvement`-type item (a redesign is a product-shape decision,
+  which the Executive Charter's own escalation rule reserves for the
+  founder, permanently - this tier does not earn its way out of that),
+  anything money-adjacent regardless of type, and any `bug`-type item
+  whose plan review flagged real uncertainty rather than a clean approve.
+This is the Harness learning loop CLAUDE.md already describes applied for
+real, not a separate mechanism - a category that keeps resolving cleanly
+the same way earns a standing path, it doesn't get declared safe from a
+single instance. On approval (either tier), move status to `approved`.
 
 **4. Execute.** Implement exactly the approved plan - nothing extra, no
 drive-by refactors, no scope creep even if you spot something else while
