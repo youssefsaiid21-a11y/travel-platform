@@ -1,7 +1,7 @@
 ---
 id: BUG-0004
 type: bug
-status: open
+status: in-review
 flow: search
 severity: degrades-experience
 owner: ui-agent
@@ -57,3 +57,44 @@ is attempted on empty input. Routed to `owner: ui-agent` since this is
 in-product copy/motion craft, not a logic change - the underlying guard
 clauses (`disabled=...`, `sendMessage`'s early return) are already
 correct and don't need to change.
+
+## Fix (ui-agent, 2026-07-14)
+
+Took the first suggested direction: the `↵` hint's visibility condition
+in `src/app/page.tsx`'s hero form was inverted from what it should be -
+`{!input && !loading && <span ...>Press Enter to search</span>}` rendered
+the hint exactly when the input was empty (Enter guaranteed to no-op) and
+hid it exactly when Enter would actually submit. Flipped the condition to
+`{input.trim() && !loading && ...}` so the hint only appears when there's
+real text to submit, matching what it claims. No changes to
+`disabled={loading || !input.trim()}` or `sendMessage`'s early-return
+guard - both already correct, per the original report.
+
+Verified in a real browser against this worktree's own dev server
+(`localhost:3101`, `.env.local` copied from the main checkout, pointed at
+the same Neon `dev` branch - never the shared 3000 session another
+background agent had open on `/booking/confirm`, left untouched): empty
+input shows no `↵` hint and a visibly dimmed disabled Search button;
+typing "Paris to Rome" makes the hint appear and the button light up;
+pressing Enter on an empty field produces zero `/api/chat` requests and no
+visible state change (network log confirmed empty); pressing Enter with
+real text ("London to New York next Friday") fires the request and the
+full NL-parse -> checkpoint card flow completes normally
+(`LHR -> JFK · 2026-07-17 · 1 passenger`, Confirm/Edit buttons rendered).
+Console showed one hydration-mismatch warning on load, entirely from
+browser-extension-injected attributes (`bis_skin_checked`, `bis_register`,
+`data-gr-ext-installed` = Grammarly) on elements untouched by this diff -
+not a regression, confirmed by reading the diff in the warning itself.
+
+`npm run lint`, `npx tsc --noEmit`, and `npm test` (60/60 files, 463/463
+passing, 3 skipped) all clean on the branch, already even with `main`'s
+tip (`55b4f3f`) at the time this was opened - no rebase needed.
+
+Not money-adjacent: touches only `src/app/page.tsx`'s hero search form,
+no `src/app/booking/**`, no `StripeCheckout`, no price/itemization
+display, no trust signal changed.
+
+Status: **`in-review`**. PR opened:
+https://github.com/youssefsaiid21-a11y/travel-platform/pull/10
+(branch `fix/bug-0004-empty-search-enter-hint`) - not merged by this
+agent, per protocol.

@@ -452,7 +452,7 @@ export default function Home() {
         title="Press / to focus search"
         aria-label="Flight search"
       />
-      {!input && !loading && (
+      {input.trim() && !loading && (
         <span className={styles.enterHint} aria-hidden="true" title="Press Enter to search">↵</span>
       )}
       <button
