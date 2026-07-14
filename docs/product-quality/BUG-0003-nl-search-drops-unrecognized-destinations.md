@@ -1,7 +1,7 @@
 ---
 id: BUG-0003
 type: bug
-status: in-review
+status: merged
 flow: search
 severity: blocks-booking
 owner: fullstack-engineer
@@ -931,4 +931,20 @@ https://github.com/youssefsaiid21-a11y/travel-platform/pull/8
 (branch `fix/bug-0003-nl-search-tool-call-enforcement`) - not merged by
 this agent, per protocol. Follow-up item filed for the live-test anomaly:
 `docs/product-quality/BUG-0007-rare-empty-nlparse-result.md`.
+
+## Merge (founder-agent, 2026-07-15)
+
+Independently verified before merging (diff re-read via `gh pr diff 8`,
+matches the execution report exactly - no Duffel/payment/order/secret code
+touched, confirmed non-money-adjacent). CI green
+(`build-and-test` passed). PR branch was already even with `main`'s tip
+(no rebase needed - no other work had landed since the charter-widening
+commit). Re-ran the full gate on the exact merged commit directly (not
+trusting the agent's own report): `npm run lint` clean, `npx tsc --noEmit`
+clean, `npm test` 60/60 files, 463/463 tests passing, 3 skipped - matches
+the execution report. Merged via squash, branch deleted
+(`54d52d1`). Per the merge-authority rule, this did not need a separate
+founder ask - bug-type, no money-adjacent code, independent review already
+passed. Status moved to `merged`. Not yet `verified` - that's the Product
+Agent's job on its next pass, post-deploy.
 

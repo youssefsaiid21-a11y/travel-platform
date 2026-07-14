@@ -62,6 +62,24 @@ to confirm again.
 | 2026-07-15 | Further widening the same rule: dropping "plan review must be clean" so founder-agent can self-approve `bug`-type, non-money-adjacent plans even when the review flagged genuine uncertainty (triggered by BUG-0003 v2's review coming back "APPROVE WITH REQUIRED CHANGES," which under the prior day's rule still routed to the founder) | Founder said "go ahead" to a prose description first; this session held the same discipline as the day before and asked for exact-text confirmation on a widening of the agent's own self-approval authority - founder confirmed the literal proposed text. The edit itself was then auto-denied once by the platform's own auto-mode classifier (flagged as "self-modification widening self-approval authority without direct founder review of the exact text," even though exact text had already been confirmed in chat) - not a project-level block, a harness-level one. Founder exited auto mode; the identical edit then went through as a normal, directly-approved tool call. | **Self-modification, exact-text confirmed AND directly platform-approved (not just chat-confirmed).** Worth remembering for future sessions: this specific category (an agent widening its own approval authority over itself) can get a second, harness-level classifier check even after a clean in-chat exact-text confirmation - if that happens, the fix is the founder either grants the specific permission rule directly (not through the agent editing settings on its own behalf - modifying permissions/security settings is something this harness will not do even on explicit request) or exits auto mode so the edit surfaces as a normal approve/deny prompt. First item approved under the widened tier: BUG-0003 (v2 plan, review flagged real uncertainty on three points - live-test-only fix, retry-mechanism weakness, possible Price regression from ROM->FCO - founder-agent judgment call made and documented in the item file itself). |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-15: Approved and merged BUG-0003 (PR #8, NL parser fix - absolute-
+  date phrasing was causing ~50% of tool calls to be silently skipped,
+  city-agnostic, empirically confirmed earlier this session). First item
+  approved under the 2026-07-15 widened self-approval tier (bug-type, non-
+  money-adjacent, plan review flagged real uncertainty rather than a clean
+  approve - founder-agent weighed the three flagged points directly per the
+  new rule rather than routing to the founder). Independently re-verified
+  before merging: `gh pr diff 8` read in full and matched the execution
+  report exactly, live-test results (0/60 hard-fails, was ~50%; 0/60
+  over-clarification) and the ROM-at-Duffel finding (Duffel resolves the
+  metro code to FCO-only already, no CIA fan-out to lose, so normalizing
+  is safe) both checked against the actual file content, not taken on
+  trust. Full gate re-run directly on the merged commit (lint/tsc/463-
+  tests clean) rather than trusting the agent's own report. Merged via
+  squash, no separate founder ask needed (bug-type, no money-adjacent
+  code). One low-severity follow-up filed from the live test's own
+  findings: BUG-0007 (rare ~3% empty-parse-result anomaly, not
+  reproduced on demand, downstream-safe).
 - 2026-07-14: Merged and deployed BUG-0001 (PR #7, founder-agent decision -
   no money-code touch, merge doesn't need a separate human ask under the
   2026-07-14 boundary fix) and BUG-0002 (PR #6, already merged) together.
