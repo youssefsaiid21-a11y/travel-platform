@@ -401,6 +401,22 @@ Rules going forward:
    `.claude/worktrees/*` directory contains its own `src/__tests__/` tree
    that `npm test`'s globbing picks up, producing spurious failures from
    stale/parallel-universe code that look like real regressions.
+6. **The founder-agent's own git commands race with a background agent's,
+   not just other agents against each other** (found 2026-07-14, dispatching
+   Product Agent's product-trio agents in the background while doing
+   founder-agent's own git work in the same working directory at the same
+   time). A background Fullstack Engineer execution checking out its own
+   branch mid-run, combined with the orchestrating session staging with a
+   directory path (`git add docs/product-quality/`) rather than named
+   files, swept the agent's own concurrent, legitimate status-transition
+   edit into the founder-agent's commit under the wrong message and
+   authorship trail. The end state was still correct here (verified by
+   diffing actual content, not trusting either side's account), but it was
+   luck, not design. Going forward: prefer `git add <specific files>` over
+   directory paths when a background agent might be active, and treat any
+   unexplained commit-message/authorship mismatch as worth tracing fully
+   (via `git reflog` and `git show <sha> --stat`) before assuming either
+   "it's fine" or "something is corrupted."
 
 ### Harness learning loop (how this charter actually gets sharper over time)
 Writing autonomy policy in prose (the section above) doesn't by itself
