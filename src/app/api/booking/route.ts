@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -198,9 +199,46 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // The card is already charged by this point (see guardrail-2 note above).
+  // An offer that has expired between confirm-page load and this request
+  // would be rejected by Duffel's order-creation endpoint anyway - catching
+  // it here turns a doomed, generic Duffel error into a labeled, diagnosable
+  // failure instead.
+  if (new Date(offer.expires_at).getTime() <= Date.now()) {
+    const failedBooking = await db.booking.update({
+      where: { id: booking.id },
+      data: {
+        status: "failed",
+        totalAmount: centsToAmountString(expectedCents),
+        totalCurrency: offer.total_currency,
+        offerSnapshot: {
+          ...(offer as unknown as Record<string, unknown>),
+          failureReason: { reason: "offer_expired", expires_at: offer.expires_at },
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+    Sentry.captureException(
+      new Error("Offer expired before Duffel order creation"),
+      {
+        tags: { route: "api/booking", failureMode: "offer_expired" },
+        extra: { bookingId: booking.id, offerId, stripePaymentIntentId, expires_at: offer.expires_at },
+      }
+    );
+    return NextResponse.json(
+      {
+        error:
+          "This price expired before we could confirm your booking. You have NOT been booked; the charge will be refunded. Reference: " +
+          booking.id,
+        booking: failedBooking,
+      },
+      { status: 410 }
+    );
+  }
+
   let duffelOrderId: string | null = null;
   let duffelBookingRef: string | null = null;
   let status = "failed";
+  let failureReason: Prisma.InputJsonValue | null = null;
 
   try {
     const order = await duffelRequest<{
@@ -249,6 +287,20 @@ export async function POST(req: NextRequest) {
     status = "confirmed";
   } catch (err) {
     console.error("Duffel order creation failed:", err);
+    const detail =
+      err instanceof DuffelError
+        ? { reason: "duffel_order_failed", status: err.status, errors: err.response.errors }
+        : { reason: "duffel_order_failed", message: err instanceof Error ? err.message : String(err) };
+    failureReason = detail as Prisma.InputJsonValue;
+    Sentry.captureException(err, {
+      tags: { route: "api/booking", failureMode: "duffel_order_creation" },
+      extra: {
+        bookingId: booking.id,
+        offerId,
+        stripePaymentIntentId,
+        duffelStatus: err instanceof DuffelError ? err.status : undefined,
+      },
+    });
   }
 
   const finalBooking = await db.booking.update({
@@ -259,7 +311,9 @@ export async function POST(req: NextRequest) {
       status,
       totalAmount: centsToAmountString(expectedCents),
       totalCurrency: offer.total_currency,
-      offerSnapshot: offer as unknown as Prisma.InputJsonValue,
+      offerSnapshot: (failureReason
+        ? { ...(offer as unknown as Record<string, unknown>), failureReason }
+        : (offer as unknown as Record<string, unknown>)) as unknown as Prisma.InputJsonValue,
     },
     include: {
       user: {

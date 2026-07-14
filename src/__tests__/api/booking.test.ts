@@ -11,8 +11,17 @@ const mockBookingCreate = vi.hoisted(() => vi.fn());
 const mockBookingUpdate = vi.hoisted(() => vi.fn());
 const mockBookingFindFirst = vi.hoisted(() => vi.fn());
 const mockSendBookingConfirmations = vi.hoisted(() => vi.fn());
+const mockSentryCaptureException = vi.hoisted(() => vi.fn());
 
 vi.mock("@/auth", () => ({ auth: mockAuth }));
+
+// Sentry.init no-ops with no DSN set (see CLAUDE.md Phase 1a), but
+// captureException is still a real function call the route makes - mock it
+// so the failure-reporting behavior itself is asserted, not just inferred
+// from the absence of a thrown error.
+vi.mock("@sentry/nextjs", () => ({
+  captureException: mockSentryCaptureException,
+}));
 
 vi.mock("@/lib/notifications", () => ({
   sendBookingConfirmations: mockSendBookingConfirmations,
@@ -133,6 +142,7 @@ beforeEach(() => {
   mockBookingFindFirst.mockReset();
   mockSendBookingConfirmations.mockReset();
   mockSendBookingConfirmations.mockResolvedValue(undefined);
+  mockSentryCaptureException.mockReset();
   // Default: claiming the PaymentIntent succeeds (no concurrent request has
   // already claimed it), producing a fresh "pending" row.
   mockBookingCreate.mockImplementation(async ({ data }: { data: object }) => ({
@@ -438,6 +448,92 @@ describe("POST /api/booking", () => {
     // this is what stops a customer whose booking failed after Duffel
     // rejected the order from getting a "you're booked" message.
     expect(mockSendBookingConfirmations).not.toHaveBeenCalled();
+  });
+
+  it("returns 410 and never calls Duffel's order-creation endpoint when the offer has already expired by the time the payment is verified", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
+    mockGetOfferWithServices.mockResolvedValueOnce(
+      makeOffer({ expires_at: "2020-01-01T00:00:00Z" })
+    );
+
+    const res = await POST(makeRequest(baseBody()));
+
+    expect(res.status).toBe(410);
+    const body = await res.json();
+    expect(body.booking.status).toBe("failed");
+    expect(body.booking.offerSnapshot.failureReason).toEqual({
+      reason: "offer_expired",
+      expires_at: "2020-01-01T00:00:00Z",
+    });
+    // getOfferWithServices is mocked separately above (it doesn't go through
+    // duffelRequest in this test), so mockDuffelRequest here is exclusively
+    // the /air/orders POST - asserting it was never called is equivalent to
+    // asserting the doomed order was never attempted, not just "no Duffel
+    // calls happened at all".
+    expect(mockDuffelRequest).not.toHaveBeenCalled();
+    expect(mockSentryCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockSentryCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ route: "api/booking", failureMode: "offer_expired" }),
+      })
+    );
+  });
+
+  it("persists the real Duffel error onto the failed booking row and reports it to Sentry, instead of swallowing it silently", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
+    mockGetOfferWithServices.mockResolvedValueOnce(makeOffer());
+    const duffelErr = new DuffelError(
+      {
+        errors: [
+          {
+            code: "airline_unavailable",
+            type: "airline_error",
+            title: "Airline unavailable",
+            message: "The airline could not confirm this booking.",
+            documentation_url: "",
+          },
+        ],
+        meta: { request_id: "req_2", status: 422 },
+      },
+      422
+    );
+    mockDuffelRequest.mockRejectedValueOnce(duffelErr);
+
+    const res = await POST(makeRequest(baseBody()));
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.booking.status).toBe("failed");
+    expect(body.booking.duffelOrderId).toBeNull();
+    expect(body.booking.offerSnapshot.failureReason).toEqual({
+      reason: "duffel_order_failed",
+      status: 422,
+      errors: duffelErr.response.errors,
+    });
+    expect(mockSentryCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockSentryCaptureException).toHaveBeenCalledWith(
+      duffelErr,
+      expect.objectContaining({
+        tags: expect.objectContaining({ route: "api/booking", failureMode: "duffel_order_creation" }),
+      })
+    );
+  });
+
+  it("writes a clean offerSnapshot with no failureReason key when the Duffel order succeeds (regression guard)", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: USER_ID } });
+    mockPaymentIntentsRetrieve.mockResolvedValueOnce(makeSucceededPaymentIntent());
+    mockGetOfferWithServices.mockResolvedValueOnce(makeOffer());
+    mockDuffelRequest.mockResolvedValueOnce({ id: "ord_001", booking_reference: "DUF123" });
+
+    const res = await POST(makeRequest(baseBody()));
+
+    const body = await res.json();
+    expect(body.booking.status).toBe("confirmed");
+    expect(body.booking.offerSnapshot).not.toHaveProperty("failureReason");
+    expect(mockSentryCaptureException).not.toHaveBeenCalled();
   });
 
   it("sends the booking confirmation once the Duffel order actually succeeds - not from the Stripe webhook, which can't tell a real order happened", async () => {
