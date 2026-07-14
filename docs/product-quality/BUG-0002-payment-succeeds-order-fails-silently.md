@@ -1,7 +1,7 @@
 ---
 id: BUG-0002
 type: bug
-status: in-progress
+status: in-review
 flow: payment
 severity: blocks-booking
 owner: fullstack-engineer
