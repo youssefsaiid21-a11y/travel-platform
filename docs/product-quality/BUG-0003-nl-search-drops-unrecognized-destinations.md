@@ -926,5 +926,9 @@ raw per-attempt telemetry (disclosed honestly in this file already - the
 fetch-spy instrumentation didn't capture data because the OpenAI SDK
 doesn't route through `globalThis.fetch` in an interceptable way).
 
-Status: **`in-review`** - PR opened next (see below).
+Status: **`in-review`**. PR opened:
+https://github.com/youssefsaiid21-a11y/travel-platform/pull/8
+(branch `fix/bug-0003-nl-search-tool-call-enforcement`) - not merged by
+this agent, per protocol. Follow-up item filed for the live-test anomaly:
+`docs/product-quality/BUG-0007-rare-empty-nlparse-result.md`.
 
