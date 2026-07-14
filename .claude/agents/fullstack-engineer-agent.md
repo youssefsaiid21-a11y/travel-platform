@@ -46,23 +46,30 @@ verdict in the item file.
 
 **3. Plan approval.** Once the plan passes review, it needs sign-off
 before any code is written. **Who gives that sign-off now has two tiers,
-earned rather than declared (2026-07-14, after BUG-0002 went through the
-full human-gated loop cleanly with zero issues):**
-- **Founder-agent approves directly** when the item is `bug`-type, the
-  plan review came back clean (no flagged uncertainty), and it does not
-  touch Duffel/payment/order/secrets (i.e. `booking-safety-reviewer` will
-  not be required at execution). Log the approval and reasoning in the
-  item file same as any other founder-agent decision.
+earned rather than declared:**
+- **Founder-agent approves directly** when the item is `bug`-type and
+  does not touch Duffel/payment/order/secrets (i.e. `booking-safety-
+  reviewer` will not be required at execution) - **regardless of whether
+  the plan review came back clean or flagged real uncertainty** (expanded
+  2026-07-15, per founder instruction, from the original 2026-07-14 tier
+  which required a clean review). Flagged uncertainty in a bug-type,
+  non-money-adjacent item is now founder-agent's own judgment call to
+  weigh: fold in any required changes the review calls for, and if the
+  uncertainty touches a product-shape tradeoff (e.g. a possible metric
+  regression), make the call and document the reasoning - including what
+  was uncertain and why the call was made - in the item file. Log the
+  approval and reasoning same as any other founder-agent decision.
 - **The human founder's own explicit sign-off is still required** for
   every `improvement`-type item (a redesign is a product-shape decision,
   which the Executive Charter's own escalation rule reserves for the
-  founder, permanently - this tier does not earn its way out of that),
-  anything money-adjacent regardless of type, and any `bug`-type item
-  whose plan review flagged real uncertainty rather than a clean approve.
-This is the Harness learning loop CLAUDE.md already describes applied for
-real, not a separate mechanism - a category that keeps resolving cleanly
-the same way earns a standing path, it doesn't get declared safe from a
-single instance. On approval (either tier), move status to `approved`.
+  founder, permanently - this tier does not earn its way out of that) and
+  anything money-adjacent regardless of type (Duffel/payment/order/
+  secrets - this also does not earn its way out, since it's a blast-
+  radius line, not a trust line).
+This is the Harness learning loop CLAUDE.md already describes applied
+further: bug-type, non-money-adjacent work is now fully founder-agent's
+lane, uncertainty and all. On approval (either tier), move status to
+`approved`.
 
 **4. Execute.** Implement exactly the approved plan - nothing extra, no
 drive-by refactors, no scope creep even if you spot something else while

@@ -1,7 +1,7 @@
 ---
 id: BUG-0003
 type: bug
-status: planned
+status: approved
 flow: search
 severity: blocks-booking
 owner: fullstack-engineer
@@ -360,4 +360,391 @@ around it.
 Founder decision: proceed with a revised plan addressing this corrected
 root cause. Model change (a different NL-parsing model/provider) explicitly
 deferred to a later, separate decision - not in scope for this item.
+
+---
+
+# PLAN v2 - REPLAN against the corrected root cause (fullstack-engineer, 2026-07-14)
+
+**Everything above from "## Root cause (confirmed against the code)" through
+"## Status / approval routing" is the v1 plan and its review. It is
+SUPERSEDED - kept only for history. The v1 root-cause theory (Madrid/Rome
+per-city recall gap) was disproven by the founder-agent's live API test.
+Do not execute v1. This v2 section is the plan of record.**
+
+## What the actual root cause is (restated, so this section stands alone)
+
+Two independent bugs, neither of which is a city-recognition gap:
+
+1. **PRIMARY - tool-call enforcement fails on absolute-date phrasing,
+   city-agnostically.** With an absolute date ("on August 15"), GLM-4-32B
+   returns NO tool call roughly half the time and instead replies in plain
+   text (a clarifying question), despite `tool_choice: "required"` being set
+   - the Z.AI proxy does not hard-enforce it. Confirmed for ANY city pair
+   (control: "London to Berlin on August 15" fails identically; both cities
+   are on the primed few-shot list). Relative phrasing ("next Friday") works
+   reliably. When no tool call comes back across all attempts, `nlParse`
+   returns the literal "Could not parse flight search from your message."
+   (nl-parser.ts line 274). This is the bug that blocks booking.
+
+2. **SECONDARY - metropolitan city code instead of an airport code.** When
+   the model DOES call the tool, it can return an IATA *city/metro* code
+   (e.g. `destination: "ROM"` for Rome, which is the city code covering
+   FCO+CIA, not a bookable airport) rather than a real airport code. The
+   code path just uppercases+slices whatever string it gets (nl-parser.ts
+   lines 360-361), and "ROM" passes `validateParams`' `/^[A-Z]{3}$/` check,
+   so it sails through to Duffel as an unintended code.
+
+## Why absolute-date phrasing specifically triggers plain-text replies
+(the mechanism the fix targets)
+
+The model wants to *ask a clarifying question* about the year ("August 15" -
+this year or next?), but we have given it **no sanctioned in-tool channel to
+do so**: the `error` field's own description (nl-parser.ts line 152-154)
+explicitly says "Set this only if the message is not a flight search **at
+all**", and the system prompt (line 179) reinforces "Set error only if the
+message is completely unrelated to travel." So a flight request that the
+model feels needs clarification has literally no permitted tool output -
+it's boxed into either guessing (which it's reluctant to do on an ambiguous
+absolute date) or breaking the "always call a tool" rule and replying in
+prose. Because `tool_choice: "required"` isn't hard-enforced by the proxy,
+the prose path wins about half the time. The relative-date case works
+because "next Friday" is unambiguous to resolve, so the model never reaches
+for clarification. **The fix therefore has to (a) remove the model's reason
+to want to clarify absolute dates, (b) give it a real in-tool channel if it
+still does, and (c) force compliance on retry - not just tolerate the plain-
+text reply and re-roll the identical prompt.**
+
+## The plan - two changes
+
+### Change 1 (PRIMARY): close the plain-text-reply path at the source
+
+All edits in `src/lib/parser/nl-parser.ts`. Four coordinated parts:
+
+**1a. Give clarification a sanctioned home - broaden the `error` field.**
+Rewrite the `error` property description (currently "Set this only if the
+message is not a flight search at all") to: set it whenever you cannot
+produce a confident search - EITHER the message isn't a flight search at
+all, OR it's flight-shaped but you genuinely need to ask the user to
+clarify something; put the clarifying question here as the value; NEVER ask
+in plain text. This converts today's silent "no tool call" failure into, at
+worst, a graceful clarifying question surfaced to the user (route.ts lines
+246-261 already render a set `error` as a normal assistant reply - no route
+change needed for this path).
+
+**1b. Remove the reason to clarify absolute dates - strengthen the date
+rule** in `buildSystemPrompt`. Make explicit that the model must resolve
+every date itself, including bare absolute dates ("August 15", "on the 15th
+of August", "December 3") to the nearest future occurrence, and must NOT ask
+the user which year - just pick it (the existing "nearest future occurrence"
+rule at line 175 already implies this for "March 10"-style inputs; this
+makes it emphatic and names the "don't ask, just resolve" behavior directly,
+which is the specific thing the model is currently failing to do).
+
+**1c. Make the "never plain text" instruction actionable** by pairing it
+with the channel from 1a. Replace the bare closing line ("Always call one of
+the two tools - never reply in plain text") with: you MUST always call one
+of the two tools and never reply in plain text under any circumstances; if
+you need to ask the user anything, do NOT answer in prose - call
+extract_flight_search and put the question in its `error` field (or use
+answer_travel_question for general questions). The instruction only works
+once 1a has actually given "ask via error" a place to land.
+
+**1d. Stop the retry loop from re-rolling the identical prompt.** Today the
+loop (lines 251-270) resends the exact same `messages` array on every
+attempt, giving the model another unforced chance to make the same plain-
+text choice. Change it so that after an attempt returns no tool call (or
+malformed JSON), before the next attempt, a corrective instruction is
+appended to `messages` - e.g. a `system`-role message: "Your previous
+response did not call a function. You MUST call extract_flight_search or
+answer_travel_question - do not reply in plain text. If you need to clarify
+something, put the question in extract_flight_search's `error` field." Using
+a `system` role sidesteps the user/assistant strict-alternation concern (it
+doesn't participate in the alternation the way an extra user turn would);
+the existing code already injects a synthetic user+assistant pair mid-array
+for `previousParams`, so the API tolerates non-trivial message structures.
+**Execution must confirm GLM accepts a trailing mid-conversation system
+message** (fallback if not: append the model's own returned text as an
+`assistant` turn followed by a `user`-role corrective, preserving
+alternation - larger but safe).
+
+**1e. Modestly raise the attempt bound** from 3 to 4 (`MAX_ATTEMPTS`). With
+a confirmed ~50% per-attempt failure rate on the affected phrasing, and with
+1d making retries materially more likely to succeed than a naive replay, 4
+attempts gives real margin without risking the route's 30s `maxDuration`:
+typical tool-call latency is 1-3s, so 4 attempts is ~4-12s in the common
+case; the per-call 10s client timeout bounds the pathological case. Not
+going higher than 4 deliberately, to stay clear of the 30s route ceiling in
+the worst case. (This is a judgment dimension, not a load-bearing number -
+3, 4, or 5 are all defensible; 4 is the honest middle given the evidence.)
+
+### Change 2 (SECONDARY): deterministic airport-code correction
+
+**New file `src/lib/parser/airports.ts`.** Export a curated
+`METRO_TO_AIRPORT` map of the well-known IATA *metropolitan/city* codes that
+are not themselves the primary bookable airport, each -> its primary airport
+code (ROM->FCO, LON->LHR, NYC->JFK, PAR->CDG, TYO->NRT, MIL->MXP, WAS->IAD,
+BUE->EZE, SAO->GRU, RIO->GIG, OSA->KIX, BJS->PEK, etc. - a bounded set,
+there are only ~30-40 IATA metro codes worldwide), seeded to be consistent
+with the primaries already in the prompt's few-shot list. Export
+`normalizeAirportCode(code): string` - uppercase+slice to 3, return the
+mapped airport if it's a known metro code, else return the code unchanged.
+
+**Apply it in `nlParse`** at each point that currently does
+`.toUpperCase().slice(0, 3)`: top-level `origin`, `destination`, the
+explore-mode `origin`, and each `additional_slices` leg's origin/
+destination. This runs BEFORE `validateParams`, so "ROM" becomes "FCO"
+before validation or Duffel ever sees it.
+
+**Scope boundary (deliberate):** this corrects the KNOWN, confirmed failure
+class (metro codes) deterministically. It does NOT attempt a full positive
+allowlist of all ~9,000 real IATA airport codes - that's an unmaintainable
+dataset and out of scope. Genuinely unknown/garbage codes still fall through
+to Duffel's own validation, which route.ts already handles with friendly,
+specific errors (lines 331-338: "We couldn't find the airport ..."). So the
+founder's "validate/correct any returned code" goal is met for the real
+failure mode without building and owning a giant airport table.
+
+## What v2 deliberately DROPS from v1, and why
+
+v1's Change B (`origin_text`/`destination_text` fields + a city-NAME->IATA
+table) and Change C (explore-gate keyword allowlist) are **not carried
+forward.** The live test disproved their premise: the model resolves city
+*names* fine (it returned ROM *because it correctly identified Rome*), and
+the reported symptom-2 silent-explore-drop ("Paris to Madrid" -> explore)
+did NOT reproduce in the live test ("Paris to Madrid next Friday" worked
+correctly). Bundling a city-name table and narrowing the legitimate explore-
+anywhere trigger (itself a frictionless-booking feature - the exact Ease-vs-
+Ease tradeoff the v1 review flagged) to fix a now-unreproduced symptom is
+scope creep against a disproven theory. **If** the silent-explore-drop is
+reproduced later, it should be filed as its own item with its own live
+repro, not smuggled in here. This keeps the diff tight and aimed only at the
+two confirmed bugs (charter: "keep the diff as small as the fix actually
+requires").
+
+## Files touched
+
+- `src/lib/parser/nl-parser.ts` - prompt (1b, 1c), `error` field desc (1a),
+  retry loop (1d, 1e), apply `normalizeAirportCode` (Change 2).
+- `src/lib/parser/airports.ts` - NEW (Change 2).
+- `src/__tests__/parser/nl-parser.test.ts` - new tests: retry appends a
+  corrective before re-calling (assert via `mockCreate.mock.calls[n]`'s
+  messages), metro-code correction (ROM->FCO for origin, destination, and a
+  multi-city leg), and the error-field-as-clarification path returning a
+  friendly `error`. Existing retry tests stay valid (the "succeeds on 3rd
+  attempt" test still passes with MAX_ATTEMPTS=4; the "gives up" test uses
+  `mockResolvedValue` for every attempt, still exhausts and returns the
+  friendly error).
+- `src/app/api/chat/route.ts` - **NO change.** The broadened `error` path
+  already surfaces as a friendly assistant reply (lines 246-261). A
+  clarifying question is deliberately NOT flagged `search_failed: true` (it
+  is a conversational turn, not a failed search - no "fix your search" hint
+  wanted). No booking/order/payment/secret code anywhere in scope.
+
+## Collision check
+
+Working tree clean on `main` (tip cedd3d3). The four `track-*` branches that
+`git diff --stat` shows touching nl-parser.ts are all fully MERGED and stale
+(0 commits ahead of main, 115 behind; their tip == merge-base - the large
+diff is divergence inflation, not active work). `ui-rehaul` touches no parser
+files. No active branch collides with this flow. No hard-block/hub files
+(`sitemap.ts`, `robots.ts`, `layout.tsx`) touched.
+
+## Booking-safety-reviewer: NOT required
+
+Parser logic, a new city-code data module, and tests. No Duffel client, no
+`/api/booking`, no payment/order creation, no secrets. Same determination as
+v1, and the v1 review confirmed it. The parser feeds search but never moves
+money or creates an order.
+
+## Honest uncertainties (flagged, not buried)
+
+1. **The primary fix cannot be proven in this environment.** It targets non-
+   deterministic LLM behavior; there is no `ZHIPU_API_KEY` here and the
+   failure is a ~50% coin-flip, so unit tests (which mock the model) can
+   only prove the *plumbing* (retry appends a corrective, error path
+   surfaces, codes normalize) - they cannot prove the model's plain-text
+   rate actually drops. The real acceptance gate is a **live repro test**
+   the founder-agent runs post-execution (it already ran the diagnostic
+   version): the exact absolute-date queries across several city pairs,
+   multiple times each, confirming the plain-text-reply rate falls
+   materially. This is the CLAUDE.md "verify in the real environment"
+   discipline, and it is REQUIRED before this is called done - a green unit
+   suite is explicitly not sufficient here.
+2. Broadening `error` (1a) may slightly increase clarifying-question turns
+   for genuinely ambiguous dates. That's a graceful outcome (a friendly
+   question beats "Could not parse"), but it is a real behavior change worth
+   watching in the live test - if the model over-clarifies dates it should
+   just resolve, 1b's wording needs tightening.
+3. The retry corrective's role/placement (1d) depends on GLM tolerating a
+   mid-conversation system message - execution must verify, fallback noted.
+4. MAX_ATTEMPTS 3-vs-4-vs-5 is a latency/reliability judgment, not a proven
+   value.
+
+## Execution tier recommendation: **Opus**
+
+This is prompt-engineering against a specific, subtle LLM failure mode -
+three prompt instructions (resolve dates confidently / route clarifications
+through `error` / never plain-text) that must reinforce rather than conflict,
+plus retry-message alternation mechanics. Wording is load-bearing here in a
+way v1's mechanical table work wasn't. Per CLAUDE.md model routing, "any
+decision where the wording itself is the fix" justifies Opus over the Sonnet
+default. Sonnet + a mandatory Opus post-execution review that specifically
+re-checks the prompt wording and the retry alternation is an acceptable
+cheaper alternative, but Opus for execution is the safer call given how much
+rides on getting three interacting instructions right.
+
+## Approval routing: needs the HUMAN FOUNDER's own sign-off (not self-approve)
+
+Per the charter, founder-agent self-approval requires a CLEAN plan review
+with no flagged uncertainty. This plan carries genuine, material uncertainty
+by its nature (item 1 above): the primary fix cannot be verified before
+merge except by a live behavioral test, and it targets a failure the founder
+themselves flagged as "meaningfully higher than occasional." That is exactly
+the "bug-type item whose plan review flags real uncertainty" case the
+charter routes to the human founder. I am NOT forcing a clean verdict to
+unlock self-approval. Final determination recorded after the fresh Opus plan
+review below.
+
+## Plan review verdict (fresh critical Opus pass, 2026-07-14)
+
+**Verdict: APPROVE WITH REQUIRED CHANGES. NOT a clean approve - genuine
+uncertainty confirmed -> routes to the human founder's own sign-off, not the
+founder-agent self-approval tier.**
+
+Confirmed correct by the review: the v2 root-cause framing matches the
+founder's live evidence (tool-call enforcement failure, phrasing-dependent,
+city-agnostic; plus the metro-code secondary bug). The mechanism analysis -
+that the model reaches for plain text because the `error` field is currently
+walled off from flight-shaped requests, leaving no sanctioned clarification
+channel - is sound and is the right thing to attack. Scope is clean: one
+flow, no hard-block/hub files, no active-branch collision (the track-*
+diffs are stale/merged, verified). booking-safety-reviewer correctly NOT
+required. Existing tests survive the MAX_ATTEMPTS bump (verified: the "3rd
+attempt" test stops at 3 calls since `input` is set; the "gives up" test
+uses a persistent mock and asserts no call count). Dropping v1's B/C is a
+defensible, disciplined call given the disproven premise.
+
+Three substantive findings (why it's not a clean approve):
+
+1. **Change 1's whole effectiveness is concentrated in ONE unverifiable
+   prompt instruction (1b), and the failure mode if it under-delivers is
+   subtle, not loud.** If 1b doesn't make the model resolve absolute dates
+   confidently, 1a+1c simply convert today's ~50% hard "Could not parse"
+   into some rate of "which year did you mean?" clarifying turns. That is
+   strictly *better* (graceful, recoverable) but it is NOT the same as
+   fixed, and a green unit suite will look identical either way because the
+   model is mocked. REQUIRED: the live acceptance test is a hard gate (not
+   optional), and it must explicitly measure BOTH (a) that the plain-text-
+   reply rate drops AND (b) that the model isn't merely trading hard-fails
+   for over-clarification of dates it should just resolve. If (b) shows up,
+   1b's wording iterates before this ships.
+
+2. **1d's primary mechanism (trailing `system` corrective) risks being
+   accepted-but-ignored - flip it with the stated fallback.** Many models
+   weight only the leading system message and treat a mid-conversation
+   system turn as low-signal; "GLM accepts it" (doesn't 400) is weaker than
+   "GLM heeds it." The plan's own fallback - capture the model's returned
+   plain-text as an `assistant` turn, then append a `user`-role corrective -
+   is both alternation-correct AND far more likely to actually change the
+   next generation (a user instruction immediately preceding generation
+   carries strong weight; we're currently discarding that assistant text
+   anyway). REQUIRED: make the assistant-text + user-corrective approach the
+   PRIMARY retry mechanism, not the fallback.
+
+3. **Change 2 assumes FCO-normalization is strictly an improvement without
+   confirming what "ROM" actually does at Duffel - and it could conflict
+   with the Price north-star.** The IATA metro code ROM covers FCO
+   (Fiumicino) AND CIA (Ciampino, the budget/Ryanair field). IF Duffel
+   accepts metro codes and searches both airports, then rewriting ROM->FCO
+   would DROP the cheaper CIA options - a Price regression to fix a bug
+   whose actual symptom was never characterized (rejected? empty? wrong
+   results?). REQUIRED: characterize the real ROM failure at Duffel (part of
+   the same live test) before assuming FCO-normalization is the right
+   correction. If Duffel handles metro codes fine, the correct fix may be to
+   leave them alone or map to a multi-airport search, not narrow to one
+   airport. Change 2 should not ship on the assumption alone.
+
+Minor / non-blocking:
+- 1d should append the corrective at most once (or dedupe), not stack an
+  identical system/user turn on every failed iteration.
+- The structural overloading behind old symptom-2 (omitted destination is
+  indistinguishable from "couldn't resolve") still exists after v2; it's
+  correctly out of scope here, but worth a one-line tracking note so it
+  isn't forgotten if it ever resurfaces.
+
+Net: the plan attacks the right cause and is honestly scoped, but its two
+load-bearing pieces (the 1b prompt instruction and the Change 2
+normalization) both rest on behavior that can only be confirmed live, and
+one retry detail (1d) should be reworked before execution. That is real
+uncertainty, not a clean approve.
+
+## Status / approval routing (v2)
+
+Status held at `planned`. Per the charter's two-tier model, this does NOT
+qualify for founder-agent self-approval - that tier requires a CLEAN review
+with no flagged uncertainty, and this review flags three substantive items,
+two of which (1b's effectiveness, Change 2's correctness) can only be
+resolved by a live test that hasn't run yet. It needs the **human founder's
+own explicit sign-off** before any code is written. On approval, fold in the
+three required changes (hard live-test gate incl. the over-clarification
+check; flip 1d to assistant-text + user-corrector as primary; characterize
+ROM-at-Duffel before shipping Change 2's normalization), then move to
+`approved`. Recommended execution tier: **Opus** (prompt wording is the fix).
+
+## Plan approval (founder-agent tier, 2026-07-15)
+
+**Approved directly by founder-agent** under the widened step-3 tier in
+`fullstack-engineer-agent.md` (2026-07-15: founder-agent can now
+self-approve `bug`-type, non-money-adjacent plans regardless of whether
+the review came back clean or flagged real uncertainty - this item is the
+first approved under that widened rule). Confirmed this item qualifies:
+`bug`-type, and per the review itself `booking-safety-reviewer` is NOT
+required (no Duffel client, no `/api/booking`, no payment/order/secrets
+touched).
+
+Weighing the three flagged uncertainties directly, as the widened rule now
+asks founder-agent to do:
+
+1. **Live-test-only fix (1b).** Accepted as an unavoidable property of
+   fixing non-deterministic model behavior, not a reason to withhold
+   approval - the review's own required gate (a mandatory live acceptance
+   test measuring both the plain-text-reply rate AND over-clarification,
+   before this is called done) is the right control and is being carried
+   into execution as a hard requirement, not a suggestion.
+2. **Retry-mechanism weakness (1d).** Straightforward - the review's
+   reasoning (a `user`-role corrective immediately preceding generation
+   carries more weight than a mid-conversation `system` aside, and the
+   assistant-text capture is already alternation-correct) is sound
+   on its face. Execution must implement the assistant-text +
+   user-corrective approach as PRIMARY, not fallback, per the review.
+3. **ROM->FCO / Change 2's Price risk.** This is the one real product-shape
+   judgment call in this plan, and it's the reason to be deliberate rather
+   than wave it through: characterizing what Duffel actually does with a
+   metro code (accepts it and searches both FCO+CIA vs. rejects it
+   outright) must happen as part of the live test, BEFORE Change 2's
+   normalization ships - not assumed. If Duffel already handles ROM fine
+   and searches both airports, execution should NOT apply the
+   normalization (leave metro codes alone, or file a follow-up for a
+   proper multi-airport search) rather than shipping a Price regression to
+   fix a bug that turns out not to need this specific fix. This is
+   explicitly called out as a required change, not a nice-to-have.
+
+**Required changes folded in as execution requirements (not optional):**
+- Hard live-test gate: measure both plain-text-reply rate drop AND
+  over-clarification rate on dates, across several absolute-date city-pair
+  queries, multiple runs each. A green unit suite alone does not close this
+  item.
+- 1d's primary mechanism is assistant-text-capture + user-role corrective,
+  not a trailing system message. Append the corrective at most once per
+  retry sequence (don't stack on every failed attempt).
+- Characterize ROM's actual behavior at Duffel as part of the live test
+  before Change 2 ships. If metro codes already resolve correctly and
+  search multiple airports, do not apply `normalizeAirportCode` in a way
+  that narrows the search - re-scope Change 2 or drop it, and note the
+  finding in this file.
+
+Execution tier: **Opus**, per the plan's own recommendation (prompt wording
+is the load-bearing part of this fix).
+
+Status moved to `approved`.
 
