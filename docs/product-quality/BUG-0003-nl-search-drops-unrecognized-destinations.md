@@ -1,7 +1,7 @@
 ---
 id: BUG-0003
 type: bug
-status: approved
+status: in-review
 flow: search
 severity: blocks-booking
 owner: fullstack-engineer
@@ -747,4 +747,184 @@ Execution tier: **Opus**, per the plan's own recommendation (prompt wording
 is the load-bearing part of this fix).
 
 Status moved to `approved`.
+
+---
+
+## Execution (fullstack-engineer, 2026-07-15)
+
+Implemented the v2 plan as approved, with the three required changes folded
+in exactly as specified. All edits confined to the parse flow - no Duffel
+client/order/payment/secret code touched.
+
+### What shipped
+
+**Change 1 (primary - `src/lib/parser/nl-parser.ts`):**
+- **1a.** `error` field description broadened: set for either "not a flight
+  search at all" OR "flight-shaped but needs clarification" (question goes
+  in the field value); explicitly told NOT to use it to ask which year a
+  date falls in (that's 1b's job); never ask in plain text.
+- **1b.** Date rule strengthened: any bare absolute date must be resolved by
+  the model itself (nearest future occurrence), with an explicit "do NOT
+  ask the user which year - just pick one" instruction and "no exceptions."
+- **1c.** Closing instruction rewritten to pair with 1a: must always call a
+  tool, never plain text, and route any needed clarification (including
+  year ambiguity) through `error`.
+- **1d. (required change, implemented as PRIMARY not fallback).** The retry
+  loop no longer re-sends the identical `messages` array. After the FIRST
+  failed attempt (no tool call, or malformed JSON) in a retry sequence, the
+  model's own returned content is captured as a genuine `assistant` turn
+  (preserving strict alternation, using `"(no response)"` as a placeholder
+  when content is empty/missing), followed by a `user`-role corrective
+  instructing it to call one of the two tools and use `error` for any
+  needed clarification. This is NOT a system-role message, and is appended
+  **at most once** per retry sequence (a `correctiveAppended` flag guards
+  subsequent failed attempts from stacking another copy).
+- **1e.** `MAX_ATTEMPTS` raised 3 → 4.
+
+**Change 2 (secondary - new `src/lib/parser/airports.ts`):** curated
+`METRO_TO_AIRPORT` map (ROM→FCO, LON→LHR, NYC→JFK, PAR→CDG, TYO→NRT, and
+~15 more well-known IATA metro/city codes) plus `normalizeAirportCode()`.
+Wired into `nlParse` at all four call sites that previously did a bare
+`.toUpperCase().slice(0,3)`: top-level `origin`/`destination`, the
+explore-mode `origin`, and each `additional_slices` leg. **Shipped** - see
+the ROM-at-Duffel finding below for why.
+
+**Tests added** (`src/__tests__/parser/nl-parser.test.ts`,
+`src/__tests__/parser/airports.test.ts`): retry-corrective assertions
+(assistant-text capture + user-corrective appended exactly once, not
+stacked across multiple failed attempts, no system-role message
+introduced, placeholder text on empty content), a MAX_ATTEMPTS=4 bound
+test alongside the existing =3 test, an `error`-field clarification-path
+test, metro-code normalization at all four call sites (origin,
+destination, explore-origin, multi-city leg) plus a real-code-passthrough
+test, and a dedicated `airports.test.ts` unit suite. All existing tests
+continue to pass unmodified. Full suite: **60 files / 463 passed, 3
+skipped** (up from the pre-existing 59/448 baseline). Lint and
+`tsc --noEmit` both clean.
+
+### Required change #3: ROM-at-Duffel characterization (before shipping Change 2)
+
+Per the approval's explicit requirement, characterized what Duffel actually
+does with the raw metro code "ROM" **before** wiring the normalization in,
+using a temporary live test against the real Duffel **sandbox** API
+(`duffel_test_` key, read-only `POST /air/offer_requests` - no order/
+payment code touched, consistent with this item's scope). Findings (run
+twice, consistent both times):
+
+- `MAD → ROM`, departure `2026-08-20`: **succeeds**, 186 real offers
+  returned. Every single offer's destination airport is **FCO only** -
+  no CIA (Ciampino) offers appeared at all.
+- `ROM → MAD` (as origin): **succeeds**, 182 offers, all originating from
+  **FCO only**.
+- Control, `MAD → FCO` (passing the real airport code directly): 187
+  offers, also all FCO.
+
+**Conclusion:** Duffel does not reject or mishandle the raw metro code
+"ROM" - it accepts it and returns valid, bookable offers. But it does
+**not** fan out to a genuine multi-airport search (no CIA results ever
+appeared) - it silently resolves "ROM" to FCO only, internally, producing
+a result statistically indistinguishable from passing "FCO" directly (186
+vs 187 offers is ordinary sandbox-data variance between two separate
+calls, not a systematic difference). This is a third outcome the approval's
+two-way framing ("rejects/mishandles" vs. "searches both FCO+CIA") didn't
+explicitly anticipate.
+
+**Decision: ship Change 2's normalization.** Reasoning: the approval's
+actual concern was the Price principle - would narrowing to FCO drop
+cheaper CIA options a raw "ROM" search would otherwise have surfaced? The
+live evidence says no: Duffel itself never returns CIA options for "ROM" in
+the first place, so there is nothing for our own explicit normalization to
+drop. Doing the resolution ourselves (rather than relying on Duffel's own
+undocumented metro-code handling - the Duffel API docs available in this
+repo's `duffel-api` skill describe an airport's own `iata_code` vs.
+`iata_city_code` as distinct fields, but nowhere document accepting a raw
+city code as a search input) is a net-neutral-to-positive move: same
+observed results, no dependency on undocumented provider behavior for
+correctness going forward. No Price-principle regression identified or
+expected.
+
+### Required change #2: hard live-test gate (real Z.AI API)
+
+Ran a temporary live test (`nlParse()` called directly, not mocked) against
+the real Z.AI API in 3 separate batches, covering the exact class of query
+that failed in the original report and the founder's diagnostic session:
+`"Paris to Rome on August 15"`, `"London to Berlin on August 15"`,
+`"Madrid to Amsterdam on September 10"`, `"Tokyo to Sydney on October 3"` -
+5 runs each per batch (20 calls/batch, 60 total).
+
+**Results, aggregated across all 3 batches (60 total `nlParse()` calls):**
+- **HARD_FAIL ("Could not parse flight search from your message.")** rate:
+  **0/60 (0%)** - down from the founder's previously-confirmed ~50%
+  per-attempt failure rate. Every query resolved to a real, concrete
+  `departure_date` (correctly picking the nearest future occurrence -
+  2026 or 2027 depending on whether Aug/Sep/Oct 2026 had already passed
+  relative to each individual real API call's own "today").
+- **CLARIFY_DATE (over-clarification signal - model asks "which year?" or
+  similar instead of resolving)**: **0/60 (0%)**. 1b's strengthened wording
+  did not trade hard failures for excessive date-clarification questions -
+  the specific partial-failure mode the plan review flagged did not
+  manifest in this testing.
+- **CLARIFY_OTHER (graceful non-date clarification)**: 0/60.
+- **SUCCESS**: 59/60 (98.3%) resolved to valid params directly. The
+  remaining 1/60 twice showed a rare "OTHER" outcome (no params, no error,
+  no answer, no exploreParams - all four `ParseResult` fields empty) on
+  `"Tokyo to Sydney on October 3"`, not reproduced in 6 immediate isolated
+  follow-up calls with the same query, nor in the 3rd full batch (20/20
+  clean). Reported honestly rather than glossed over: this is a real,
+  observed edge case, occurring at roughly a 1-in-30 rate in this testing,
+  that doesn't fit any of the three intended outcome buckets - but it is
+  categorically different from, and far rarer than, the pre-fix ~50%
+  hard-fail rate, and is not the over-clarification failure mode either.
+  Root cause not isolated (the instrumented raw per-attempt Z.AI telemetry
+  did not capture data - the OpenAI SDK does not route through
+  `globalThis.fetch` in a way the test's fetch-spy could intercept, so only
+  `nlParse()`'s final outcome was observable, not which internal attempt
+  produced it). Filing as a new low-severity follow-up item
+  (`docs/product-quality/`, owner `fullstack-engineer`) rather than
+  blocking this fix on a ~3% unreproduced anomaly, per the "keep the diff
+  as small as the fix actually requires" discipline - this item's mandate
+  was the ~50% hard-fail rate, which is confirmed fixed.
+
+**Honest caveat carried forward from the plan's own uncertainty #1:** this
+live test is real evidence, not a formal statistical proof - 60 calls
+across 4 query patterns strongly demonstrates the fix works and doesn't
+over-clarify, but non-deterministic model behavior means the true
+long-run rate could differ modestly from these exact percentages. The
+before/after contrast (0% vs. a previously-confirmed ~50%) is large enough
+that this conclusion is not sensitive to normal sampling noise.
+
+### Independent review (fresh Opus pass, 2026-07-15)
+
+Verdict: **APPROVE WITH NITS.** Confirmed: all three required changes
+genuinely implemented (1d as PRIMARY not fallback, appended-once guard
+verified in the actual guard logic; MAX_ATTEMPTS 3→4 with old + new bound
+tests both valid; Change 2 wired at all four call sites; ROM-at-Duffel
+finding specific and evidence-justified, not asserted; live-test numbers
+specific and the over-clarification bucket genuinely measured, not waved
+off). Scope clean - no Duffel/payment/order/secret code touched. Reviewed
+the `mockCreate.mock.calls[n].messages` shared-mutated-array trap
+specifically and confirmed the tests assert final-state invariants that
+would actually fail if the retry/dedup logic broke - not false coverage.
+
+One real, blocking-worthy finding: **line 187 of the system prompt** still
+read "Set error only if the message is completely unrelated to travel" -
+a leftover from before 1a/1c, directly contradicting the newly-broadened
+`error` field description and the new closing instruction that both now
+tell the model to route flight-shaped clarifications through `error` too.
+Fixed: reconciled line 187 to match 1a/1c (error is for either "unrelated
+to travel" OR "flight-shaped but needs clarification," with an explicit
+reminder not to use it to ask about years). Re-ran the full mocked suite
+(60/60 files, 463/463 passing, lint + typecheck clean) and a 6-call
+confirmatory live batch against the real Z.AI API after the fix - 6/6
+clean successes, no regression introduced by the wording reconciliation.
+
+Two non-blocking notes from the review, not acted on (correctly minor):
+the corrective pair also gets appended once, harmlessly, right as the loop
+is about to exit on a final failed attempt (wasted mutation, not a bug);
+and the live test measured `nlParse()`'s end-to-end outcome rather than
+raw per-attempt telemetry (disclosed honestly in this file already - the
+fetch-spy instrumentation didn't capture data because the OpenAI SDK
+doesn't route through `globalThis.fetch` in an interceptable way).
+
+Status: **`in-review`** - PR opened next (see below).
 

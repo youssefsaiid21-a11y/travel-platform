@@ -380,8 +380,8 @@ describe("nlParse - 10 NL query fixtures", () => {
   });
 });
 
-function makeNoToolCallResponse() {
-  return { choices: [{ message: { tool_calls: [] } }] };
+function makeNoToolCallResponse(content = "Sure, which year did you mean?") {
+  return { choices: [{ message: { tool_calls: [], content } }] };
 }
 
 describe("nlParse - retry loop for a model that skips the tool call", () => {
@@ -391,7 +391,7 @@ describe("nlParse - retry loop for a model that skips the tool call", () => {
 
   // Real usage showed occasional back-to-back "no tool call" responses from
   // the model despite tool_choice: "required" - this asserts the retry loop
-  // actually retries up to its bound (currently 3 attempts) rather than
+  // actually retries up to its bound (currently 4 attempts) rather than
   // giving up after just one.
   it("succeeds if the 3rd attempt finally returns a real tool call", async () => {
     mockCreate.mockResolvedValueOnce(makeNoToolCallResponse());
@@ -412,13 +412,227 @@ describe("nlParse - retry loop for a model that skips the tool call", () => {
     expect(params?.origin).toBe("LHR");
   });
 
-  it("gives up with a friendly error after exhausting all attempts", async () => {
+  // MAX_ATTEMPTS was bumped 3 -> 4 (BUG-0003 v2, 1e) - this proves the bound
+  // actually moved, not just that 3 still works.
+  it("succeeds if the 4th attempt finally returns a real tool call", async () => {
+    mockCreate.mockResolvedValueOnce(makeNoToolCallResponse());
+    mockCreate.mockResolvedValueOnce(makeNoToolCallResponse());
+    mockCreate.mockResolvedValueOnce(makeNoToolCallResponse());
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        destination: "JFK",
+        departure_date: "2026-09-01",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+
+    const { params, error } = await nlParse("London to New York September 1st", [], null);
+
+    expect(mockCreate).toHaveBeenCalledTimes(4);
+    expect(error).toBeNull();
+    expect(params?.origin).toBe("LHR");
+  });
+
+  it("gives up with a friendly error after exhausting all 4 attempts", async () => {
     mockCreate.mockResolvedValue(makeNoToolCallResponse());
 
     const { params, error } = await nlParse("London to New York September 1st", [], null);
 
+    expect(mockCreate).toHaveBeenCalledTimes(4);
     expect(params).toBeNull();
     expect(error).toBe("Could not parse flight search from your message.");
+  });
+
+  // BUG-0003 v2 (1d, required change): the retry corrective's PRIMARY
+  // mechanism is capturing the model's own returned content as an
+  // `assistant` turn followed by a `user`-role corrective - NOT a
+  // system-role aside. This asserts the exact messages the 2nd call
+  // receives after the 1st call fails.
+  it("appends the model's own returned text as an assistant turn, then a user-role corrective, after a failed attempt", async () => {
+    mockCreate.mockResolvedValueOnce(makeNoToolCallResponse("Did you mean this year or next year?"));
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        destination: "JFK",
+        departure_date: "2026-09-01",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+
+    await nlParse("London to New York on September 1st", [], null);
+
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    // `messages` is mutated in place and the same array reference is passed
+    // to every call, so any call index reflects the array's final state -
+    // there's only one mutation here (after the 1st failed attempt), so this
+    // is unambiguous regardless of which recorded call we read it from.
+    const finalMessages = mockCreate.mock.calls[1][0].messages;
+    const lastTwo = finalMessages.slice(-2);
+
+    expect(lastTwo[0]).toEqual({
+      role: "assistant",
+      content: "Did you mean this year or next year?",
+    });
+    expect(lastTwo[1].role).toBe("user");
+    expect(lastTwo[1].content).toMatch(/must call/i);
+    expect(lastTwo[1].content).toMatch(/error/i);
+
+    // Exactly ONE system message (the leading system prompt) - the corrective
+    // must NOT be introduced as an additional system-role message, since the
+    // assistant/user pair is the PRIMARY mechanism, not layered alongside a
+    // system-role fallback.
+    const systemMessages = finalMessages.filter((m: { role: string }) => m.role === "system");
+    expect(systemMessages).toHaveLength(1);
+  });
+
+  it("does not stack a second corrective if the attempt after the first correction also fails", async () => {
+    mockCreate.mockResolvedValueOnce(makeNoToolCallResponse("First failure."));
+    mockCreate.mockResolvedValueOnce(makeNoToolCallResponse("Second failure."));
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        destination: "JFK",
+        departure_date: "2026-09-01",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+
+    await nlParse("London to New York on September 1st", [], null);
+
+    expect(mockCreate).toHaveBeenCalledTimes(3);
+    // Base conversation is system prompt + the user's message (2 entries).
+    // Even though 2 attempts failed, only ONE corrective pair (assistant +
+    // user) should ever be appended - not one per failed attempt - giving 4
+    // total, not 6. (`messages` is the same mutated array reference across
+    // every recorded call, so any call index shows this final state.)
+    const finalMessages = mockCreate.mock.calls[2][0].messages;
+    expect(finalMessages).toHaveLength(4);
+    const correctiveUserMessages = finalMessages.filter(
+      (m: { role: string; content: string }) => m.role === "user" && /must call/i.test(m.content)
+    );
+    expect(correctiveUserMessages).toHaveLength(1);
+  });
+
+  it("captures an empty/missing content as a placeholder assistant turn instead of crashing", async () => {
+    mockCreate.mockResolvedValueOnce({ choices: [{ message: { tool_calls: [] } }] });
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        destination: "JFK",
+        departure_date: "2026-09-01",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+
+    const { params, error } = await nlParse("London to New York on September 1st", [], null);
+
+    expect(error).toBeNull();
+    expect(params?.origin).toBe("LHR");
+    const secondCallMessages = mockCreate.mock.calls[1][0].messages;
+    expect(secondCallMessages.at(-2)).toEqual({ role: "assistant", content: "(no response)" });
+  });
+});
+
+describe("nlParse - clarifying question via the error field (BUG-0003 1a)", () => {
+  beforeEach(() => {
+    mockCreate.mockReset();
+  });
+
+  it("surfaces a flight-shaped-but-ambiguous clarifying question through error, not plain text", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        error: "I couldn't tell which airport you meant by \"Springfield\" - could you clarify the city or airport code?",
+      })
+    );
+    const { params, answer, error } = await nlParse(
+      "Flights to Springfield next week",
+      [],
+      null
+    );
+    expect(params).toBeNull();
+    expect(answer).toBeNull();
+    expect(error).toMatch(/Springfield/);
+  });
+});
+
+describe("nlParse - metro/city IATA code correction (BUG-0003 Change 2)", () => {
+  beforeEach(() => {
+    mockCreate.mockReset();
+  });
+
+  it("normalizes a metro code returned as the destination (ROM -> FCO)", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "MAD",
+        destination: "ROM",
+        departure_date: "2026-08-15",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    const { params, error } = await nlParse("Madrid to Rome on August 15", [], null);
+    expect(error).toBeNull();
+    expect(params?.destination).toBe("FCO");
+  });
+
+  it("normalizes a metro code returned as the origin (ROM -> FCO)", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "ROM",
+        destination: "MAD",
+        departure_date: "2026-08-15",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    const { params, error } = await nlParse("Rome to Madrid on August 15", [], null);
+    expect(error).toBeNull();
+    expect(params?.origin).toBe("FCO");
+  });
+
+  it("normalizes a metro code in an explore-anywhere origin", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "ROM",
+        departure_date: "2026-08-15",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    const { exploreParams } = await nlParse("Anywhere from Rome next week", [], null);
+    expect(exploreParams?.origin).toBe("FCO");
+  });
+
+  it("normalizes a metro code inside an additional_slices leg", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        destination: "CDG",
+        departure_date: "2026-10-01",
+        passengers: [{ type: "adult", count: 1 }],
+        additional_slices: [
+          { origin: "CDG", destination: "ROM", departure_date: "2026-10-05" },
+        ],
+      })
+    );
+    const { params, error } = await nlParse(
+      "London to Paris Oct 1, then Paris to Rome Oct 5",
+      [],
+      null
+    );
+    expect(error).toBeNull();
+    expect(params?.additional_slices?.[0].destination).toBe("FCO");
+  });
+
+  it("leaves a real (non-metro) airport code unchanged", async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeToolResponse({
+        origin: "LHR",
+        destination: "FCO",
+        departure_date: "2026-08-15",
+        passengers: [{ type: "adult", count: 1 }],
+      })
+    );
+    const { params } = await nlParse("London to Rome on August 15", [], null);
+    expect(params?.destination).toBe("FCO");
   });
 });
 

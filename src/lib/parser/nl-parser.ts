@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { ConversationMessage, ExploreParams, SearchParams } from "./types";
+import { normalizeAirportCode } from "./airports";
 
 const client = new OpenAI({
   apiKey: process.env.ZHIPU_API_KEY ?? "",
@@ -150,7 +151,14 @@ const EXTRACT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
         error: {
           type: "string",
           description:
-            "Set this only if the message is not a flight search at all. Leave unset for valid searches.",
+            "Set this whenever you cannot produce a confident search - EITHER the message " +
+            "is not a flight search at all, OR it IS flight-shaped but you genuinely need " +
+            "to ask the user something to proceed (e.g. a place name you can't resolve to " +
+            "an airport). Put the clarifying question itself here as the value. Leave unset " +
+            "for valid, confident searches. Do NOT use this to ask which year a date falls " +
+            "in - resolve absolute dates yourself (see the date rules below) rather than " +
+            "asking. NEVER ask a clarifying question in plain text outside a tool call - " +
+            "always call this tool and put the question in this field instead.",
         },
       },
       // destination is intentionally NOT required - omitting it is how the
@@ -172,18 +180,18 @@ Use answer_travel_question when the user asks a general travel question (visas, 
 Flight search rules:
 - Always convert city/country names to the primary IATA airport code (London→LHR, New York→JFK, Paris→CDG, Tokyo→NRT, Sydney→SYD, Dubai→DXB, Bangkok→BKK, Los Angeles→LAX, Chicago→ORD, Amsterdam→AMS, Toronto→YYZ, Singapore→SIN, Berlin→BER, Lisbon→LIS, Barcelona→BCN).
 - For vague dates ("next Friday", "sometime in October"), pick the nearest upcoming occurrence and record it in flexible_date_note.
-- For a specific month/day given with no year ("March 10", "June 20th"), assume the nearest future occurrence: if that month/day has already passed this year, use next year instead of this year.
+- For ANY specific month/day given with no year ("March 10", "June 20th", "August 15", "on the 15th of August", "December 3"), you MUST resolve it yourself to a concrete date - do NOT ask the user which year they meant, just pick one: assume the nearest future occurrence, i.e. if that month/day has already passed this year, use next year instead of this year. This is a hard rule with no exceptions - a bare absolute date is never a reason to ask a clarifying question or to skip calling a tool.
 - Default to 1 adult passenger if not specified.
 - On follow-up messages, carry forward ALL parameters from the previous search that the user did not explicitly change.
 - If the user says "add return" or "make it a return", add return_date approximately 7 days after departure.
-- Set error only if the message is completely unrelated to travel (e.g. "tell me a joke").
+- Set error whenever you cannot produce a confident search: either the message is completely unrelated to travel (e.g. "tell me a joke"), OR it IS a flight request but you genuinely need to ask the user something to proceed (e.g. an unresolvable place name). Put the question itself in error. Never use error to ask which year a date falls in - resolve absolute dates yourself per the rule above instead.
 - For refundable/cancellable requests, set prefer_refundable=true; for changeable/amendable, set prefer_changeable=true.
 - For time preferences: 'after midnight' → depart_after '00:00' + depart_before '05:59'; 'morning' → depart_after '06:00' + depart_before '11:59'; 'afternoon' → depart_after '12:00' + depart_before '17:59'; 'evening' → depart_after '18:00' + depart_before '22:59'; 'overnight'/'red-eye' → depart_after '21:00'; 'before noon' → depart_before '11:59'; specific time like 'after 3pm' → depart_after '15:00'.
 - For seat/legroom/meal preferences, baggage requests, or specific seat numbers: ignore them (these are booked after selection, not searchable) and proceed with the flight search normally.
 - For multi-city trips (3+ different cities in one journey), put the first leg in origin/destination/departure_date and every subsequent leg in additional_slices, in order. Do not set return_date on a multi-city trip.
 - If the user has no specific destination in mind ('anywhere', 'surprise me', 'where can I go from London this weekend', 'somewhere cheap in Europe'), omit the destination field entirely - this triggers explore-anywhere mode, which searches many popular destinations and returns a ranked list. Still fill in origin, departure_date (and return_date if implied), passengers, cabin_class, and max_budget if a budget was mentioned.
 - If the user mentions a budget or price ceiling ('under £300', 'budget of $500', 'cheap flights'), set max_budget to the numeric amount when a specific number is given.
-- Always call one of the two tools - never reply in plain text.`;
+- You MUST always call one of the two tools and NEVER reply in plain text, under any circumstances. If you need to ask the user anything to proceed - including a place you can't resolve to an airport - do NOT answer in prose: call extract_flight_search and put the question in its \`error\` field (or use answer_travel_question for general travel questions). This applies even when you feel unsure - an in-tool clarifying question is always the right move, a plain-text reply never is.`;
 }
 
 export interface ParseResult {
@@ -235,19 +243,21 @@ export async function nlParse(
   // instead of just retrying around it.
   //
   // The retry loop below is a second layer for the cases forcing tool_choice
-  // doesn't cover: some OpenAI-compatible proxies don't enforce "required"
-  // 100% of the time, and a model can still return malformed JSON in
-  // function.arguments. Bounded at 3 attempts (not a loop), so a genuinely
-  // broken request still fails fast instead of hanging - bumped from 2 after
-  // real usage showed occasional back-to-back "no tool call" responses that
-  // exhausted the original single retry; isolated repeated testing against
-  // the real API couldn't reproduce it on demand, consistent with a
-  // transient burst in the model/proxy's tool-call enforcement rather than
-  // something deterministic about any particular prompt shape.
-  const MAX_ATTEMPTS = 3;
+  // doesn't cover: the Z.AI proxy does not hard-enforce "required" - live
+  // testing found the model returns NO tool call (a plain-text clarifying
+  // question instead) roughly HALF the time on absolute-date phrasing
+  // ("on August 15"), for any city pair, despite tool_choice: "required" -
+  // far more often than "occasional". A model can also still return
+  // malformed JSON in function.arguments. Bounded at 4 attempts (bumped
+  // from 3), so a genuinely broken request still fails fast instead of
+  // hanging.
+  const MAX_ATTEMPTS = 4;
   let toolCallName: string | null = null;
   let input: Record<string, unknown> | null = null;
   let lastFailureReason = "";
+  // Appended at most once per retry sequence (not stacked on every failed
+  // attempt) - see below.
+  let correctiveAppended = false;
   for (let attempt = 0; attempt < MAX_ATTEMPTS && !input; attempt++) {
     const response = await client.chat.completions.create({
       model: MODEL,
@@ -256,16 +266,43 @@ export async function nlParse(
       tool_choice: "required",
     });
 
-    const toolCall = response.choices[0]?.message?.tool_calls?.[0];
+    const responseMessage = response.choices[0]?.message;
+    const toolCall = responseMessage?.tool_calls?.[0];
     if (!toolCall || toolCall.type !== "function") {
       lastFailureReason = "model returned no tool call";
-      continue;
+    } else {
+      try {
+        input = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
+        toolCallName = toolCall.function.name;
+      } catch {
+        lastFailureReason = "model returned malformed tool-call JSON";
+      }
     }
-    try {
-      input = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
-      toolCallName = toolCall.function.name;
-    } catch {
-      lastFailureReason = "model returned malformed tool-call JSON";
+
+    // Primary retry-correction mechanism (not a fallback, and not a
+    // system-role message): a mid-conversation `system` aside risks being
+    // accepted-but-ignored by the model (many models weight only the
+    // leading system message), whereas a `user`-role instruction
+    // immediately preceding the next generation carries real weight. This
+    // captures the model's own returned content (whatever it actually
+    // said, even if empty) as a genuine `assistant` turn - preserving
+    // strict user/assistant alternation instead of silently discarding
+    // what it said - then appends a `user`-role corrective. Appended only
+    // once per retry sequence: if the model fails again after correction,
+    // the loop just retries the same corrected conversation rather than
+    // stacking a second identical instruction.
+    if (!input && !correctiveAppended) {
+      correctiveAppended = true;
+      const assistantText = responseMessage?.content?.trim() || "(no response)";
+      messages.push({ role: "assistant", content: assistantText });
+      messages.push({
+        role: "user",
+        content:
+          "You did not call a function. You MUST call either extract_flight_search " +
+          "or answer_travel_question now - do not reply in plain text. If you need " +
+          "to ask me anything to proceed (e.g. to clarify a date or place), call " +
+          "extract_flight_search and put the question in its `error` field.",
+      });
     }
   }
 
@@ -318,7 +355,7 @@ export async function nlParse(
   // of popular destinations instead.
   if (!hasDestination) {
     const exploreParams: ExploreParams = {
-      origin: input.origin.toUpperCase().slice(0, 3),
+      origin: normalizeAirportCode(input.origin),
       departure_date: input.departure_date,
       ...(input.return_date ? { return_date: input.return_date as string } : {}),
       passengers,
@@ -357,8 +394,8 @@ export async function nlParse(
   }
 
   const params: SearchParams = {
-    origin: input.origin.toUpperCase().slice(0, 3),
-    destination: (input.destination as string).toUpperCase().slice(0, 3),
+    origin: normalizeAirportCode(input.origin),
+    destination: normalizeAirportCode(input.destination as string),
     departure_date: input.departure_date,
     // A trip is either a return trip or a multi-city trip, never both - if the
     // model (or carried-forward state) produced a stale return_date alongside
@@ -384,8 +421,8 @@ export async function nlParse(
       ? {
           additional_slices: (input.additional_slices as Array<Record<string, unknown>>).map(
             (s) => ({
-              origin: (s.origin as string).toUpperCase().slice(0, 3),
-              destination: (s.destination as string).toUpperCase().slice(0, 3),
+              origin: normalizeAirportCode(s.origin as string),
+              destination: normalizeAirportCode(s.destination as string),
               departure_date: s.departure_date as string,
             })
           ),
