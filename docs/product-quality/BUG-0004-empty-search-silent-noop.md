@@ -1,7 +1,7 @@
 ---
 id: BUG-0004
 type: bug
-status: in-review
+status: merged
 flow: search
 severity: degrades-experience
 owner: ui-agent

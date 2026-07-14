@@ -62,6 +62,26 @@ to confirm again.
 | 2026-07-15 | Further widening the same rule: dropping "plan review must be clean" so founder-agent can self-approve `bug`-type, non-money-adjacent plans even when the review flagged genuine uncertainty (triggered by BUG-0003 v2's review coming back "APPROVE WITH REQUIRED CHANGES," which under the prior day's rule still routed to the founder) | Founder said "go ahead" to a prose description first; this session held the same discipline as the day before and asked for exact-text confirmation on a widening of the agent's own self-approval authority - founder confirmed the literal proposed text. The edit itself was then auto-denied once by the platform's own auto-mode classifier (flagged as "self-modification widening self-approval authority without direct founder review of the exact text," even though exact text had already been confirmed in chat) - not a project-level block, a harness-level one. Founder exited auto mode; the identical edit then went through as a normal, directly-approved tool call. | **Self-modification, exact-text confirmed AND directly platform-approved (not just chat-confirmed).** Worth remembering for future sessions: this specific category (an agent widening its own approval authority over itself) can get a second, harness-level classifier check even after a clean in-chat exact-text confirmation - if that happens, the fix is the founder either grants the specific permission rule directly (not through the agent editing settings on its own behalf - modifying permissions/security settings is something this harness will not do even on explicit request) or exits auto mode so the edit surfaces as a normal approve/deny prompt. First item approved under the widened tier: BUG-0003 (v2 plan, review flagged real uncertainty on three points - live-test-only fix, retry-mechanism weakness, possible Price regression from ROM->FCO - founder-agent judgment call made and documented in the item file itself). |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-15: Deployed BUG-0003 to production (`vercel --prod`, explicit
+  founder authorization in-session - production had been 5 commits behind
+  since it does not auto-deploy on push to `main`), then processed the
+  rest of the open queue in two parallel worktree-isolated background
+  agents per direct founder instruction to route routine work through
+  founder-agent rather than asking: UI Agent on BUG-0004 (PR #10, merged),
+  Fullstack Engineer on BUG-0006 (PR #9, merged) then BUG-0007 (PR #11,
+  docs-only - investigated thoroughly, root cause not confirmed, no
+  speculative fix shipped, left `open`). BUG-0005 explicitly withheld from
+  both agents - money-adjacent, permanently founder-gated regardless of
+  the widened tier, founder was away. All three merged PRs independently
+  re-verified before merging (full diffs read, CI checked, rebased onto
+  current `main`, full gate re-run on the actual merged commit) rather
+  than trusting agent self-reports. Found and fixed a real tooling gap
+  during this: `.claude/worktrees/` (background-agent git worktrees) was
+  polluting local lint/test runs with duplicate suite copies against a
+  shared dev DB, causing spurious failures unrelated to any real diff -
+  fixed via `eslint.config.mjs`/`vitest.config.ts` exclude patterns,
+  committed directly (config/tooling only, no app logic, no money-
+  adjacent code).
 - 2026-07-15: Approved and merged BUG-0003 (PR #8, NL parser fix - absolute-
   date phrasing was causing ~50% of tool calls to be silently skipped,
   city-agnostic, empirically confirmed earlier this session). First item
