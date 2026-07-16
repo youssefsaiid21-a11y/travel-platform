@@ -3,11 +3,21 @@ import type { NormalizedOffer } from "@/lib/duffel/types";
 import type { ChatResponse, CheckpointEvent } from "@/app/api/chat/route";
 
 const mockCreate = vi.hoisted(() => vi.fn());
+const mockSentryCaptureException = vi.hoisted(() => vi.fn());
 
 vi.mock("openai", () => ({
   default: class MockOpenAI {
     chat = { completions: { create: mockCreate } };
   },
+}));
+
+// Sentry.init no-ops with no DSN set (see CLAUDE.md Phase 1a), but
+// captureException is still a real function call the route makes - mock it
+// so BUG-0007's telemetry (which phase an unhandled stream error hit) is
+// actually asserted, not just inferred from the absence of a thrown error.
+// Matches the convention in src/__tests__/api/booking.test.ts.
+vi.mock("@sentry/nextjs", () => ({
+  captureException: mockSentryCaptureException,
 }));
 
 vi.mock("@/lib/duffel/search", () => ({
@@ -153,6 +163,7 @@ describe("POST /api/chat", () => {
     vi.mocked(searchWithFallback).mockReset();
     vi.mocked(searchWithFallback).mockResolvedValue(MOCK_SEARCH_RESULT);
     vi.mocked(exploreDestinations).mockReset();
+    mockSentryCaptureException.mockReset();
     // generateSearchReply calls mockCreate a second time; let it return undefined → uses template fallback
   });
 
@@ -560,6 +571,30 @@ describe("POST /api/chat", () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+
+  it("BUG-0007: an unhandled exception during NL parsing still emits an SSE error event and reports it to Sentry tagged with the failing phase", async () => {
+    // nl-parser.ts's retry loop calls client.chat.completions.create()
+    // without wrapping it in a try/catch (the only internal try/catch
+    // covers JSON.parse of the tool call arguments) - so a rejection here
+    // propagates uncaught out of nlParse() straight to this route's outer
+    // catch. This simulates that gap to verify BUG-0007's telemetry: the
+    // existing SSE error behavior must be unchanged, and Sentry must now
+    // see it tagged with phase: "nl_parse".
+    mockCreate.mockRejectedValueOnce(new Error("simulated Z.AI outage"));
+
+    const res = await POST(makeRequest({ message: "London to New York next Friday" }));
+    const errorEvent = await readSSEEvent<{ message: string }>(res, "error");
+
+    expect(errorEvent.message).toBeTruthy();
+
+    expect(mockSentryCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockSentryCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ route: "api/chat", phase: "nl_parse" }),
+      })
+    );
   });
 
   it("offer prices are raw strings from Duffel - no computed price in response", async () => {

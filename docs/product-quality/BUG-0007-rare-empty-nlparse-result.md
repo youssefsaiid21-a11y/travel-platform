@@ -193,3 +193,38 @@ No code changes shipped for this item - all temporary instrumentation
 standalone live-test file) was added, used, and then fully removed
 before concluding; `git status`/`git diff` on `src/lib/parser/nl-parser.ts`
 confirmed clean (no residual diff) after cleanup.
+
+## Telemetry added (fullstack-engineer, 2026-07-16)
+
+Implemented this item's own recommended next step: added *permanent*
+production telemetry to `src/app/api/chat/route.ts`'s existing outer catch
+block, rather than more temporary/local sampling. A `phase` tracker
+variable (`"session_init"` / `"nl_parse"` / `"explore_search"` /
+`"duffel_search"` / `"price_calendar_and_reply"`) is updated immediately
+before each major `await` in the stream handler, so the catch block knows
+which phase was in flight when an unhandled exception hit it. On any such
+exception, the catch now calls `Sentry.captureException(err, { tags: {
+route: "api/chat", failureMode: "unhandled_stream_error", phase }, extra:
+{ sessionId: session_id ?? null } })` (plus a `console.error`) *before*
+the pre-existing behavior (the SSE `error` event push and
+`controller.close()`), which is otherwise completely unchanged - no
+user-visible behavior differs. No PII/message text is sent.
+
+This does NOT fix the underlying issue - it's instrumentation only, per
+this item's own investigation conclusion above (adding a catch-and-
+return-null inside `nl-parser.ts` itself, without confirming the
+mechanism, would mask a real infra failure as a fake user-input failure).
+**Status stays `open`.** Once this ships to production, watch Sentry for
+`route:api/chat` + `failureMode:unhandled_stream_error` events, especially
+with `phase:nl_parse` - if real user traffic is hitting this, that's the
+confirmation needed to decide the real product-shape question (surface
+the real error, as today; or degrade gracefully with a generic reply). If
+nothing fires over a reasonable observation window, that's evidence this
+was specific to the original disposable test harness's own error handling
+(see the 2026-07-14 investigation above), not a live production gap.
+
+PR: `fix/bug-0007-chat-telemetry` branch, opened against `main`, tests/
+lint/typecheck all clean, independent Opus review passed clean. Not yet
+merged - awaiting the founder-agent's merge decision (see this repo's
+Fullstack Engineer agent doc: merges are not automatically the
+founder-agent's call, brought back for a live decision here).
