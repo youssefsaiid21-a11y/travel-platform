@@ -1,7 +1,7 @@
 ---
 id: BUG-0005
 type: bug
-status: open
+status: in-review
 flow: payment
 severity: blocks-booking
 owner: fullstack-engineer
@@ -56,3 +56,19 @@ as the amount-verification check the route presumably already does.
 Still money-adjacent (it's in the payment-intent creation path), so
 `booking-safety-reviewer` review is still required on the resulting diff,
 same as BUG-0002.
+
+## Resolution (2026-07-16)
+
+Implemented as planned: `src/app/api/stripe/payment-intent/route.ts` now
+checks `new Date(offer.expires_at).getTime() <= Date.now()` immediately
+after the amount-validation guard and before `stripe.paymentIntents.create`,
+returning 410 on expiry. Also logs `Sentry.captureException` (tags:
+`route: "api/stripe/payment-intent"`, `failureMode: "offer_expired_preauth"`)
+so this guard's real-world hit rate is measurable, matching
+`api/booking/route.ts`'s existing post-charge check. New test added in
+`src/__tests__/api/payment-intent.test.ts`. Independent Opus review: PASS,
+no issues. `booking-safety-reviewer`: clean against all 5 checks. Plan
+sign-off and this diff's merge decision both required the human founder's
+explicit approval separately, per this item's money-adjacent status - plan
+approved 2026-07-16 (with the Sentry addition, per independent plan
+review's recommendation); merge is a separate, still-pending ask.
