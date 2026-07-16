@@ -114,15 +114,19 @@ land instead of letting it go stale the way the old scope note did.
   candidate (`updatedAt`) gets rewritten by the same write that records a
   check result, corrupting itself. Revisit when Sentry/prod metrics show
   the cron approaching its time ceiling, not on a calendar.
-- **Phase 2 (code done, migration NOT yet applied to prod):** JWT session
-  revocation via a `tokenVersion` column on `User`, checked in the `jwt`
-  callback (not `session` - returning `null` from `jwt` is what next-auth
-  actually uses to invalidate a session; `session` runs too late to stop
-  a session body being produced). `change-password` increments it
-  atomically alongside the password hash. Migration file is written
-  (`prisma/migrations/20260707215113_user_token_version/`) but deliberately
-  NOT run against the shared production Neon DB yet - needs explicit
-  human approval, since local dev and prod share one database here.
+- **Phase 2 - DONE:** JWT session revocation via a `tokenVersion` column on
+  `User`, checked in the `jwt` callback (not `session` - returning `null`
+  from `jwt` is what next-auth actually uses to invalidate a session;
+  `session` runs too late to stop a session body being produced).
+  `change-password` increments it atomically alongside the password hash.
+  Migration `prisma/migrations/20260707215113_user_token_version/` is
+  confirmed applied against the shared production Neon DB (verified
+  2026-07-16 directly via `prisma migrate status` + a raw
+  `_prisma_migrations` query, both read-only - `finished_at` is set, no
+  rollback). This paragraph previously said the migration was still
+  pending human approval; that was stale - it had already been run at
+  some earlier point without this doc being updated to match, the same
+  class of drift the top of this file already warns about once.
 - **Phase 3 (UX) - DONE:** an editable "here's what we understood" checkpoint
   (`checkpoint` SSE event, `ChatRequest.confirmed_params` to resume) between
   the user's message and the real search firing. Editing is just sending a
@@ -180,22 +184,22 @@ land instead of letting it go stale the way the old scope note did.
   "Automatically expose System Environment Variables" enabled in Vercel
   project settings for `/api/version` to return a real commit instead of
   `null`.
-- **Phase 5 (code done, migration NOT yet applied to prod):** migrated
-  `Booking.offerSnapshot`/`searchParams`/`passengerNames` and
-  `TrackedSearch.passengers` from hand-serialized `String` JSON to native
-  Prisma `Json` columns - the exact pattern behind a real "uncaught
-  JSON.parse" bug class already fixed once. All read/write call sites
-  updated (no more manual `JSON.parse`/`JSON.stringify`); `TrackedSearch`'s
-  duplicate-tracking lookup now compares via `{ equals: ... }` on the Json
-  field, which is also a correctness improvement over the old TEXT-based
-  approach - jsonb equality is key-order-independent, string equality
-  wasn't. Migration file is written
-  (`prisma/migrations/20260707224602_booking_json_columns/`) but
-  deliberately NOT run against the shared production Neon DB yet - this
-  ALTERs existing columns with existing customer booking data (`USING
-  col::jsonb`, which fails loudly if any row's text isn't valid JSON,
-  rather than silently corrupting it) - needs explicit human approval
-  before running, same as Phase 2's migration.
+- **Phase 5 - DONE:** migrated `Booking.offerSnapshot`/`searchParams`/
+  `passengerNames` and `TrackedSearch.passengers` from hand-serialized
+  `String` JSON to native Prisma `Json` columns - the exact pattern behind
+  a real "uncaught JSON.parse" bug class already fixed once. All read/write
+  call sites updated (no more manual `JSON.parse`/`JSON.stringify`);
+  `TrackedSearch`'s duplicate-tracking lookup now compares via
+  `{ equals: ... }` on the Json field, which is also a correctness
+  improvement over the old TEXT-based approach - jsonb equality is
+  key-order-independent, string equality wasn't. Migration
+  `prisma/migrations/20260707224602_booking_json_columns/` (which `ALTER`s
+  existing columns with existing customer booking data via `USING
+  col::jsonb`, failing loudly rather than silently corrupting on any
+  non-JSON row) is confirmed applied against the shared production Neon DB
+  (verified 2026-07-16, same read-only check as Phase 2, no rollback). As
+  with Phase 2 above, this paragraph previously said the migration was
+  still pending - stale, already run without the doc being updated.
 - **Open product decisions, not code tasks:** should `PassengerProfile`
   support more than one saved passenger per account (bookings already
   support multiple passengers per transaction, saved-profile convenience
