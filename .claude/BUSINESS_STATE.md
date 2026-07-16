@@ -63,6 +63,21 @@ to confirm again.
 | 2026-07-16 | A fresh session tried to act on the *already-established* 2026-07-15 self-merge tier for `bug`-type, non-money PRs (BUG-0007) without re-confirming it in this session - blocked outright, citing that the session's generic "execute without interrupting me" wasn't specific enough to cover a self-merge. A follow-up attempt to widen `.claude/settings.json` itself (adding standing autoMode rules for both this and read-only prod-DB queries), even after the founder picked "grant a standing permission rule" from an explicit multiple-choice question, was also hard-blocked - citing the agent's own fixed, non-overridable rule against modifying permission/security settings on its own behalf (separate from the harness classifier layer, per the 2026-07-15 entry above). A later attempt to run a specific read-only command (`prisma migrate status`) was blocked once, then succeeded after a direct one-time founder yes to that exact command - no settings change involved, just a live confirmation. Merging the two PRs was blocked twice more: once on a real transient classifier error (explicit retry-often-succeeds message, did not clear on retry), then again on a vague "yes to both, go ahead" (rejected as not specifically naming which PRs) - only cleared once the founder named both PR numbers explicitly in the same message as the merge verb. | Founder walked through each block individually rather than fighting any of them; no rule changes ended up applied. | **A standing project-level policy (like the 2026-07-15 self-merge tier) is not the same thing as a standing harness-level permission, and does not by itself re-arm after context resets or in a fresh session** - it has to either be reflected in `.claude/settings.json`'s actual `autoMode.allow` rules (which the founder must add directly - an agent editing that file on its own behalf to grant itself more authority is refused as a category, not case-by-case) or re-confirmed live, specifically, each time. Read-only actions against prod are a separate, lighter case: no settings edit needed, just a specific one-time go-ahead naming the exact command. Merge decisions need the PR number(s) named explicitly in the same message as the approval - "yes," "go ahead," "continue," and similar generic phrasing do not clear that bar even when the founder's intent seems obvious from context. |
 
 ## Recent autonomous decisions (most recent first)
+- 2026-07-16: Deployed to production (`vercel --prod`, explicit founder
+  authorization named specifically as "deploy now" after an earlier bare
+  "go ahead" was correctly rejected as not naming the action - see
+  calibration log). Shipped BUG-0005, BUG-0007's telemetry, the CLAUDE.md
+  staleness fix, and everything since the 2026-07-15 deploy (BUG-0004,
+  BUG-0006, the BUG-0007 investigation doc). Review gate: lint/tsc/465
+  tests clean on the merged commit; `booking-safety-reviewer` clean on the
+  one money-adjacent diff (BUG-0005). Real browser verification of the
+  user-facing changes was NOT done this round (impractical to simulate a
+  genuinely expired Duffel offer through the live UI in-session) - flagged
+  to the founder explicitly rather than silently skipped, relying instead
+  on automated test coverage plus the two independent code reviews.
+  Confirmed via `/api/version` that production's commit
+  (`12a1c6d744ce0309c78e340c6acbad8a4f308e4f`) matches local `main` HEAD
+  exactly.
 - 2026-07-16: Closed out BUG-0005, BUG-0007, and the two "pending" prod-DB
   migrations. BUG-0005 (pre-charge offer-expiry guard on the Stripe
   payment-intent route, money-adjacent) got a real independent plan review
