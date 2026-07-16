@@ -9,6 +9,7 @@ import { enforceRateLimit, checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import type { NormalizedOffer } from "@/lib/duffel/types";
 import type { ExploreDestinationResult, ExploreParams, SearchParams } from "@/lib/parser/types";
 import { track } from "@vercel/analytics/server";
+import * as Sentry from "@sentry/nextjs";
 
 // Parses (LLM) + Duffel search + price calendar can each take up to the
 // client-level 10s timeout; give this route enough headroom to not get cut
@@ -89,6 +90,14 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(sse(event, data)));
       };
 
+      // Tracks which phase of the request the stream was in when an
+      // unhandled error hit the outer catch below - readable from the
+      // catch block, not just at the throw site. See BUG-0007: the goal is
+      // telemetry to determine whether real production traffic is hitting
+      // an unhandled-exception gap (e.g. in nlParse's uncaught network
+      // call), not to change any user-visible behavior.
+      let phase = "session_init";
+
       try {
         const session = await getOrCreate(session_id);
 
@@ -137,6 +146,7 @@ export async function POST(req: NextRequest) {
           // ── Step 1: parse ────────────────────────────────────────────
           push("status", { step: "parsing", message: "Understanding your request…" });
 
+          phase = "nl_parse";
           const parsed = await nlParse(message.trim(), session.history, session.last_params);
           params = parsed.params;
           error = parsed.error;
@@ -215,6 +225,7 @@ export async function POST(req: NextRequest) {
           });
 
           let exploreResults: ExploreDestinationResult[] = [];
+          phase = "explore_search";
           try {
             exploreResults = await exploreDestinations(exploreParams);
           } catch {
@@ -319,6 +330,7 @@ export async function POST(req: NextRequest) {
         let dateAdjusted = false;
         let searchError: string | null = null;
 
+        phase = "duffel_search";
         try {
           const result = await searchWithFallback(params);
           offers = result.offers;
@@ -378,6 +390,7 @@ export async function POST(req: NextRequest) {
         // and offer list show - i.e. the post-filter cheapest, not the raw one -
         // otherwise a preference filter (e.g. refundable-only) makes the calendar
         // contradict what's actually on screen for that date.
+        phase = "price_calendar_and_reply";
         const [priceCalendar, reply] = await Promise.all([
           offers.length > 0
             ? getPriceCalendar(usedParams, 3, {
@@ -421,6 +434,12 @@ export async function POST(req: NextRequest) {
 
         controller.close();
       } catch (err) {
+        console.error(`api/chat: unhandled error during ${phase}`, err);
+        Sentry.captureException(err, {
+          tags: { route: "api/chat", failureMode: "unhandled_stream_error", phase },
+          extra: { sessionId: session_id ?? null },
+        });
+
         const msg = err instanceof Error ? err.message : "Something went wrong";
         push("error", { message: msg });
         controller.close();
