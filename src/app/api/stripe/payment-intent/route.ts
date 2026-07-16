@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { auth } from "@/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getStripe } from "@/lib/stripe";
@@ -48,6 +49,25 @@ export async function POST(req: NextRequest) {
   const amountCents = chargeAmountCents(offer.total_amount);
   if (!Number.isFinite(amountCents) || amountCents <= 0) {
     return NextResponse.json({ error: "Invalid offer amount." }, { status: 400 });
+  }
+
+  // An offer that's already expired should never reach Stripe - creating a
+  // PaymentIntent for a dead offer only leads to a doomed Duffel
+  // order-creation attempt after the card has already been charged (see
+  // BUG-0002). This is the last point before a charge exists where
+  // refusing outright is still possible. Logged to Sentry (not just
+  // returned) because this is the only place that can measure whether the
+  // guard is actually firing in production - the analogous post-charge
+  // check in api/booking/route.ts already logs the same way.
+  if (new Date(offer.expires_at).getTime() <= Date.now()) {
+    Sentry.captureException(new Error("Offer expired before payment-intent creation"), {
+      tags: { route: "api/stripe/payment-intent", failureMode: "offer_expired_preauth" },
+      extra: { offerId, userId: session.user.id, expires_at: offer.expires_at },
+    });
+    return NextResponse.json(
+      { error: "This offer has expired. Please search again." },
+      { status: 410 }
+    );
   }
 
   try {

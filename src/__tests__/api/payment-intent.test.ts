@@ -5,8 +5,13 @@ import type { NormalizedOffer } from "@/lib/duffel/types";
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockPaymentIntentsCreate = vi.hoisted(() => vi.fn());
 const mockGetOfferWithServices = vi.hoisted(() => vi.fn());
+const mockSentryCaptureException = vi.hoisted(() => vi.fn());
 
 vi.mock("@/auth", () => ({ auth: mockAuth }));
+
+vi.mock("@sentry/nextjs", () => ({
+  captureException: mockSentryCaptureException,
+}));
 
 vi.mock("stripe", () => ({
   default: class MockStripe {
@@ -49,6 +54,7 @@ beforeEach(() => {
   mockAuth.mockReset();
   mockPaymentIntentsCreate.mockReset();
   mockGetOfferWithServices.mockReset();
+  mockSentryCaptureException.mockReset();
 });
 
 describe("POST /api/stripe/payment-intent", () => {
@@ -138,6 +144,27 @@ describe("POST /api/stripe/payment-intent", () => {
     const res = await POST(makeRequest({ offerId: "off_expired" }));
     expect(res.status).toBe(410);
     expect(mockPaymentIntentsCreate).not.toHaveBeenCalled();
+  });
+
+  it("returns 410 and reports to Sentry when the offer has already expired", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: "usr_1" } });
+    mockGetOfferWithServices.mockResolvedValueOnce(
+      makeOffer({ expires_at: "2020-01-01T00:00:00Z" })
+    );
+
+    const res = await POST(makeRequest({ offerId: "off_abc123" }));
+    expect(res.status).toBe(410);
+    const body = await res.json();
+    expect(body.error).toMatch(/expired/i);
+    expect(mockPaymentIntentsCreate).not.toHaveBeenCalled();
+    expect(mockSentryCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockSentryCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { route: "api/stripe/payment-intent", failureMode: "offer_expired_preauth" },
+        extra: expect.objectContaining({ offerId: "off_abc123", userId: "usr_1" }),
+      })
+    );
   });
 
   it("returns 400 when the offer's amount is invalid", async () => {
